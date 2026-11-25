@@ -1,0 +1,40 @@
+[project]
+name = "decima-stars"
+version = "0.1.0"
+description = "Stellar ages, [Fe/H], [alpha/Fe], distances and extinctions from spectroscopy + Gaia/2MASS with neural posterior estimation on MIST isochrones"
+readme = "README.md"
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "torch>=2.5",
+    "sbi>=0.25,<0.26",  # the flows are rebuilt with sbi's builders (decima.models)
+    "arviz<1",          # sbi 0.25 imports arviz.data, gone in arviz 1
+    "nflows",
+    "zuko",
+    "astropy",
+    "healpy",
+    "h5py",
+    "pooch",
+]
+
+[project.scripts]
+decima = "decima.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/decima"]
+
+[dependency-groups]
+dev = ["pytest"]
+
+[tool.uv]
+# The regression test compares against isosbi bit for bit, so the dev env uses isosbi's versions.
+constraint-dependencies = ["torch==2.5.1", "sbi==0.25.0", "nflows==0.14", "zuko==1.5.0", "numpy==2.2.6"]
+
+[tool.pytest.ini_options]
+markers = ["slow: needs the full models (DECIMA_DATA_DIR) and a few minutes of CPU"]
