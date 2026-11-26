@@ -1,18 +1,18 @@
-"""Extinction laws for stage 2: R_b = A_b / E', with E' the extinction stage 2 fits.
+"""Extinction laws for stage 2: R_b = A_b / E, with E the extinction stage 2 fits (A0 or E(B-V), depending on the law).
 
 Pick a built-in law by name, or build one:
 
-    get_law("F19")  # default: Fitzpatrick+19 EDR3, colour-dependent, E' = A0
-    FixedLaw({"G": 2.29, "BP": 3.05, "RP": 1.74, "J": 0.63, "H": 0.32, "Ks": 0.16})  # constant R_b, E' = E(B-V)
+    get_law("F19")  # default: Fitzpatrick+19 EDR3, colour-dependent, E = A0
+    FixedLaw({"G": 2.29, "BP": 3.05, "RP": 1.74, "J": 0.63, "H": 0.32, "Ks": 0.16})  # constant R_b, E = E(B-V)
     PolynomialLaw(coeffs, x="BP-RP", x_range=(-0.06, 2.5)) # Fitzpatrick+19-form polynomial
     class MyLaw(ExtinctionLaw): ...   # anything else
 
 Built-in laws:
-    SS2018, WC2019  fixed R_b per band (Schlafly & Finkbeiner 2018; Wang & Chen 2019); E' is E(B-V).
+    SS2018, WC2019  fixed R_b per band (Schlafly & Finkbeiner 2018; Wang & Chen 2019); E is E(B-V).
     F19             Fitzpatrick+19 EDR3 ("HRDTop" fit): k_b = A_b / A0 is a polynomial in the draw's intrinsic
-                    (BP-RP)_0 and in A0. E' is A0 (at 550 nm); `to_ebv` divides by R_V = 3.1.
+                    (BP-RP)_0 and in A0. E is A0 (at 550 nm); `to_ebv` divides by R_V = 3.1.
     F19_TEFF        the same law with Teff / 5040 K of the draw in place of (BP-RP)_0.
-    none            no extinction: R_b = 0, so stage 2 fits the distance modulus alone (E' = 0), e.g. for mock stars.
+    none            no extinction: R_b = 0, so stage 2 fits the distance modulus alone (E = 0): a distance but no extinction estimate, e.g. for mock stars.
 
 A law is called as `law(mag_fields, iso_cols, (n_stars, n_draws), device, A0=None)` and returns (R_b, colour_clipped):
 R_b is (n_bands, 1, 1) for a fixed law and (n_bands, n_stars, n_draws) for a colour-dependent one; colour_clipped
@@ -29,9 +29,9 @@ BANDS = ("G", "BP", "RP", "J", "H", "Ks")
 SS2018 = {"G": 2.294, "BP": 3.046, "RP": 1.737, "J": 0.632, "H": 0.318, "Ks": 0.158}
 WC2019 = {"G": 1.890, "BP": 2.429, "RP": 1.429, "J": 0.582, "H": 0.313, "Ks": 0.186}
 
-F19_BPRP_RANGE = (-0.06, 2.5)  # validity range of the (BP-RP)_0 fit
+F19_BPRP_RANGE = (-0.06, 2.5) # validity range of the (BP-RP)_0 fit
 F19_TEFF_NORM = 5040.0
-F19_TEFF_RANGE = (3500.0 / F19_TEFF_NORM, 10000.0 / F19_TEFF_NORM)  # validity range of the TeffNorm fit
+F19_TEFF_RANGE = (3500.0 / F19_TEFF_NORM, 10000.0 / F19_TEFF_NORM) # validity range of the TeffNorm fit
 POLY_TERMS = ("Intercept", "X", "X2", "X3", "A", "A2", "A3", "XA", "AX2", "XA2")
 _F19_KNAME = {"G": "kG", "BP": "kBP", "RP": "kRP", "J": "kJ", "H": "kH", "Ks": "kK"}
 
@@ -49,13 +49,13 @@ EXTINCTION_LAWS = ("SS2018", "WC2019", "F19", "F19_TEFF", "none")
 class ExtinctionLaw:
     """Base class. A subclass sets `bands` (band -> anything; the bands it has coefficients for) and implements
     `__call__` (see the module docstring), and `to_dict` if runs using it should be reproducible from config.json."""
-    colour_dependent = False  # True: R_b depends on the fitted E', so stage 2 refits once at the fitted value
-    columns = ()              # isochrone columns read by __call__ besides the fitted bands
+    colour_dependent = False # True: R_b depends on the fitted E, so stage 2 refits once at the fitted value
+    columns = () # isochrone columns read by __call__ besides the fitted bands
     bands = {}
-    extinction_name = "ebv"   # what E' is; names the output column
+    extinction_name = "ebv" # what E is; names the output column
 
     def __init__(self, grey: float = 0.0):
-        self.grey = grey  # added to every R_b
+        self.grey = grey # added to every R_b
 
     def check(self, mag_fields):
         missing = [b for b in mag_fields if b not in self.bands]
@@ -63,7 +63,7 @@ class ExtinctionLaw:
             raise ValueError(f"No R_b extinction coefficient for bands: {missing}")
 
     def to_ebv(self, e):
-        """The fitted E' as E(B-V)."""
+        """The fitted E as E(B-V)."""
         return e
 
     def to_dict(self) -> dict:
@@ -115,7 +115,7 @@ class PolynomialLaw(ExtinctionLaw):
         X = X.clamp(*self.x_range)
         A = A0.clamp(0.0, self.a0_max)
         basis = torch.stack([torch.ones_like(X), X, X**2, X**3, A, A**2, A**3, X * A, A * X**2, X * A**2])
-        a = torch.tensor([self.coeffs[b] for b in mag_fields], dtype=X.dtype, device=X.device)  # (n_bands, 10)
+        a = torch.tensor([self.coeffs[b] for b in mag_fields], dtype=X.dtype, device=X.device) # (n_bands, 10)
         return torch.einsum("bt,t...->b...", a, basis)
 
     def __call__(self, mag_fields, iso_cols, shape, device, A0=None):
@@ -124,9 +124,9 @@ class PolynomialLaw(ExtinctionLaw):
             x = (10 ** iso_cols["log_Teff"] / self.teff_norm).view(shape).float()
         else:
             x = (iso_cols["BP"] - iso_cols["RP"]).view(shape).float()
-        clipped = (x < self.x_range[0]) | (x > self.x_range[1])  # off-grid draws (NaN) count as not clipped
+        clipped = (x < self.x_range[0]) | (x > self.x_range[1]) # off-grid draws (NaN) count as not clipped
         A0 = torch.zeros_like(x) if A0 is None else A0
-        x = x.to(A0.dtype)  # a float64 fit evaluates the polynomial in float64
+        x = x.to(A0.dtype) # a float64 fit evaluates the polynomial in float64
         return self.k(mag_fields, x, A0) + self.grey, clipped
 
     def to_ebv(self, e):

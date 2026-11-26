@@ -49,7 +49,7 @@ def _prepare(source, out, columns, cfg, chunk):
     rejected.write(out / "rejected.ecsv", overwrite=True)
     inputs.save(out / "inputs.pt")
     (out / "job.json").write_text(json.dumps(job))
-    (out / "config.json").write_text(cfg.to_json())  # last: its presence with inputs.pt marks a prepared run
+    (out / "config.json").write_text(cfg.to_json()) # last: its presence with inputs.pt marks a prepared run
     _log(out, f"PREPARED  {len(inputs)} stars, {len(rejected)} rejected, chunks of {chunk}")
 
 
@@ -63,7 +63,7 @@ def _worker(out, k, workers):
     cfg = Config.from_json((out / "config.json").read_text())
     chunk = json.loads((out / "job.json").read_text())["chunk"]
     inputs = StarInputs.load(out / "inputs.pt")
-    models = None  # loaded lazily so a resumed worker with nothing left to do exits quickly
+    models = None # loaded lazily so a resumed worker with nothing left to do exits quickly
     for c in range(k, -(-len(inputs) // chunk), workers):
         path = _chunk_file(out, c)
         if path.exists():
@@ -73,12 +73,12 @@ def _worker(out, k, workers):
         t = time.time()
         try:
             res = run_chunk(inputs.slice(lo, lo + chunk), models, cfg, seed=cfg.seed + lo)
-        except Exception as e:  # logged and skipped; re-running retries it
+        except Exception as e: # logged and skipped; re-running retries it
             traceback.print_exc()
             _log(out, f"FAILED  chunk {c} on worker {k}: {type(e).__name__}: {e}")
             continue
         tmp = Path(str(path) + ".tmp")
-        with open(tmp, "wb") as f:  # a file handle stops numpy appending ".npz" to the name
+        with open(tmp, "wb") as f: # a file handle stops numpy appending ".npz" to the name
             np.savez_compressed(f, **res)
         os.replace(tmp, path)
         _log(out, f"chunk {c} (stars {lo}-{lo + len(res['ids'])}) worker {k} {time.time() - t:.0f}s")
@@ -110,7 +110,7 @@ def run(source, out, columns: dict = None, config: Config = None, workers: int =
     Returns the path of the summary table."""
     out, cfg = Path(out), config or Config()
     _prepare(source, out, columns, cfg, chunk)
-    ctx = mp.get_context("spawn")  # fresh interpreters: no forked torch / CUDA state
+    ctx = mp.get_context("spawn") # fresh interpreters: no forked torch / CUDA state
     procs = [ctx.Process(target=_worker, args=(str(out), k, workers)) for k in range(workers)]
     for p in procs:
         p.start()

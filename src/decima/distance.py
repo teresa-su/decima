@@ -28,7 +28,7 @@ class GeneralizedGamma(TransformedDistribution):
     def __init__(self, alpha, beta, L, validate_args=None):
         self.alpha, self.beta, self.L = broadcast_all(alpha, beta, L)
         base = Gamma(concentration=(self.beta + 1) / self.alpha, rate=torch.ones_like(self.alpha))
-        transforms = [PowerTransform(1 / self.alpha), AffineTransform(loc=0.0, scale=self.L)]  # y -> L y^(1/alpha)
+        transforms = [PowerTransform(1 / self.alpha), AffineTransform(loc=0.0, scale=self.L)] # y -> L y^(1/alpha)
         super().__init__(base, transforms, validate_args=validate_args)
 
 
@@ -37,7 +37,7 @@ def _bj_ggd_table():
     t = np.loadtxt(BJ21_PRIOR_TABLE, delimiter=",", skiprows=1)
     t = t[np.argsort(t[:, 0])]
     assert len(t) == 12288 and (t[:, 0] == np.arange(12288)).all()
-    return t[:, 1:]  # (12288, 3): L, alpha, beta
+    return t[:, 1:] # (12288, 3): L, alpha, beta
 
 
 def bj_prior_params(ra, dec, default=BJ_DEFAULT_PARAMS):

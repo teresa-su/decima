@@ -1,6 +1,6 @@
 """MIST isochrones on a regular grid in theta = ([Fe/H], [alpha/Fe], log(age/yr), EEP), linearly interpolated with torch.
 
-Loaded from the model release's `grid.npz` (axes, the value cube and its column names), built from MIST v1.2
+Loaded from the model release's `grid.npz` (axes, the value cube and its column names), built from MIST v2.5
 (v/v_crit = 0.4). The interpolation reproduces scipy's linear `RegularGridInterpolator` exactly: the same cell search (grid[i] <= x < grid[i+1], end cells for points on the upper edge), the same 16-corner weights summed in the same order, and NaN for points outside the grid or with a NaN coordinate. A NaN at any of the 16 corners makes the result NaN (0 * NaN = NaN), which marks off-isochrone draws as invalid downstream.
 
 Columns: the bands G, BP, RP (Gaia EDR3) and J, H, Ks (2MASS), log_Teff, log_g and ln_dm_dEEP_prior (log IMF prior per
@@ -14,12 +14,17 @@ import torch
 
 
 class IsochroneGrid:
-    _LOOKUP_CHUNK = 500_000  # query points interpolated at once (bounds memory)
+    """The MIST grid: isochrone columns (magnitudes, log_Teff, log_g, IMF prior) on the 4-d theta grid, interpolated linearly.
 
-    def __init__(self, met, alpha, ages, eep_grid, min_eep, max_eep, grid_cube, columns, device="cpu"):
-        self.met, self.alpha, self.ages, self.eep_grid = met, alpha, ages, eep_grid
+    Axes: feh ([Fe/H]), alpha_fe ([alpha/Fe]), ages (log10 age / yr) and eep_grid (EEP, valid between min_eep and max_eep).
+    `lookup` / `get_columns` evaluate columns at theta points (n, 4); off the isochrones the result is NaN.
+    """
+    _LOOKUP_CHUNK = 500_000 # query points interpolated at once (bounds memory)
+
+    def __init__(self, feh, alpha_fe, ages, eep_grid, min_eep, max_eep, grid_cube, columns, device="cpu"):
+        self.feh, self.alpha_fe, self.ages, self.eep_grid = feh, alpha_fe, ages, eep_grid
         self.min_eep, self.max_eep = float(min_eep), float(max_eep)
-        self.grid_cube = grid_cube  # (n_met, n_alpha, n_age, n_eep, n_cols) float64, NaN off the isochrones
+        self.grid_cube = grid_cube # (n_feh, n_alpha_fe, n_age, n_eep, n_cols) float64, NaN off the isochrones
         self.col_map = list(columns)
         self._col_map = {c: i for i, c in enumerate(self.col_map)}
         self.to(device)
@@ -27,6 +32,7 @@ class IsochroneGrid:
     @classmethod
     def load(cls, path, device="cpu") -> "IsochroneGrid":
         with np.load(path) as d:
+            # the npz names the [Fe/H] and [alpha/Fe] axes "met" and "alpha"
             return cls(*(d[k] for k in ("met", "alpha", "ages", "eep_grid", "min_eep", "max_eep", "grid_cube")),
                        columns=[str(c) for c in d["columns"]], device=device)
 
@@ -35,7 +41,7 @@ class IsochroneGrid:
         self.device = torch.device(device)
         self._axes_t = tuple(
             torch.as_tensor(a, dtype=torch.float64, device=self.device)
-            for a in (self.met, self.alpha, self.ages, self.eep_grid)
+            for a in (self.feh, self.alpha_fe, self.ages, self.eep_grid)
         )
         cube = torch.from_numpy(np.ascontiguousarray(self.grid_cube, dtype=np.float64))
         # (n_nodes, n_cols): node (i0, i1, i2, i3) is row ((i0 * n1 + i1) * n2 + i2) * n3 + i3

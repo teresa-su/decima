@@ -6,3 +6,4 @@ dist/
 models/
 REVIEW*.md
 scratch/
+*.tex

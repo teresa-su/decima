@@ -1,10 +1,13 @@
 """The trained flows and the isochrone grid: where they live and how they are rebuilt.
 
 Files (model release v1):
-    npe.pt          q(theta | x), x = ([Fe/H], [alpha/Fe], log Teff, pseudo abs-mag)   sbi NSF posterior
+    npe.pt          q(theta | x), x = ([Fe/H], [alpha/Fe], log Teff, M_pseudo,K)   sbi NSF posterior
     npe_spec.pt     q(theta | s), s = the first three of x                                sbi NSF posterior
     prior_spec.pt   q(s), the prior-predictive density of s (weights the latent observables)  sbi/zuko NSF
     grid.npz        the MIST grid (`decima.grid.IsochroneGrid`)
+
+The two NPEs are trained on, sample and score the transformed theta_tilde (logit of theta rescaled to the grid range,
+`decima.theta.ThetaTransformer`), not physical theta.
 
 Each .pt is a plain dict {"arch": builder kwargs, "state_dict": weights, "prior_loc"/"prior_scale" (posteriors)}, so
 it loads with `torch.load(weights_only=True)` and does not depend on pickled classes. The files are looked up in
@@ -80,8 +83,8 @@ class Models:
     theta_mapper: ThetaTransformer
     npe: DirectPosterior
     npe_spec: DirectPosterior
-    prior_spec: object  # q(s), the density of the 3 spectroscopic observables under the uniform training prior
-    device: str = "cpu"  # where stage 1 and 2 run; the outputs come back to the CPU
+    prior_spec: object # q(s), the density of the 3 spectroscopic observables under the uniform training prior
+    device: str = "cpu" # where stage 1 and 2 run; the outputs come back to the CPU
 
 
 def load_models(device: str = "cpu") -> Models:

@@ -21,7 +21,7 @@ _A = (8266.0, -2124.5574, 355.5051, -23.1719, 0.0,
 
 COLOUR_RANGE = (0.30, 4.20) # recommended range of (BP-Ks)_0 for dwarfs (Casagrande+21 Table 2); giants go to 5.30
 A_K_PER_E_BPKS = 0.124 # A_K / E(BP-Ks) = R_Ks / (R_BP - R_Ks), taken as a constant (it varies by ~0.01 over BP-RP_0 = 0.5-1.5)
-LOGG_FILL = 4.0  # log g where it is missing: the dwarf value of Casagrande+21 Sec. 4
+LOGG_FILL = 4.0 # log g where it is missing: the dwarf value of Casagrande+21 Sec. 4
 
 
 def teff_from_colour(x, logg, feh):
@@ -42,7 +42,7 @@ def intrinsic_colour(teff, logg, feh, n_iter=50, tol=1.0):
     with np.errstate(invalid="ignore"):
         for _ in range(n_iter):
             mid = 0.5 * (lo + hi)
-            too_hot = teff_from_colour(mid, logg, feh) > teff   # model hotter than the star: the intrinsic colour is redder
+            too_hot = teff_from_colour(mid, logg, feh) > teff # model hotter than the star: the intrinsic colour is redder
             lo, hi = np.where(too_hot, mid, lo), np.where(too_hot, hi, mid)
         x0 = 0.5 * (lo + hi)
         ok = np.isfinite(teff + logg + feh) & (np.abs(teff_from_colour(x0, logg, feh) - teff) < tol)

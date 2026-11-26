@@ -11,7 +11,7 @@ import torch
 
 from decima.io import build_inputs, read_table
 from decima.models import load_models
-from decima.pipeline import Advanced, Config, run_chunk, stage1, stage2
+from decima.pipeline import Config, run_chunk, stage1, stage2
 
 pytestmark = pytest.mark.skipif(not os.environ.get("DECIMA_DATA_DIR"), reason="needs DECIMA_DATA_DIR")
 
@@ -28,16 +28,15 @@ XIANG_COLUMNS = {
 ALL = ("G", "BP", "RP", "J", "H", "Ks")
 # the configs of isosbi's export_decima.REF_CONFIGS; the reference draws are per star (stars_per_batch=1) unless set,
 # and without the A_K inflation unless set
-B1 = dict(stars_per_batch=1, ak_inflate=False)
+B1 = dict(stars_per_batch=1, pseudo_mag_inflate=False)
 CONFIGS = {
     "default": Config(**B1),
-    "a0_ss2018_logg_trunc": Config(extinction="SS2018", use_logg=True, **B1, advanced=Advanced(mixture_alpha=0.0, truncate=True)),
-    "a05_f19teff_bands_batch": Config(extinction="F19_TEFF", bands=("G", "J", "Ks"), stars_per_batch=5, ak_inflate=False,
-                                      advanced=Advanced(mixture_alpha=0.5)),
-    "a1_wc2019_noimf_ceiling_ak": Config(extinction="WC2019", **dict(B1, ak_inflate=True),
-                                         advanced=Advanced(mixture_alpha=1.0, imf_prior=False, npe_ratio_ceiling=0.95)),
+    "a05_f19teff_bands_batch": Config(extinction="F19_TEFF", bands=("G", "J", "Ks"), stars_per_batch=5, pseudo_mag_inflate=False,
+                                      mixture_alpha=0.5),
+    "a1_wc2019_noimf_ceiling_ak": Config(extinction="WC2019", **dict(B1, pseudo_mag_inflate=True),
+                                         mixture_alpha=1.0, imf_prior=False, npe_ratio_ceiling=0.95),
     "none_grey": Config(extinction="none", **B1),
-    "f19_grey": Config(bands=("BP", "RP", "H", "Ks"), **B1, advanced=Advanced(grey=0.1)),
+    "f19_grey": Config(bands=("BP", "RP", "H", "Ks"), **B1, grey=0.1),
 }
 
 
@@ -59,11 +58,11 @@ def test_matches_isosbi(name, models, ref):
     cfg.n_latent_x, cfg.n_theta = 50, 20
     inputs, rejected = build_inputs(read_table(DATA / "reference_stars.ecsv", XIANG_COLUMNS), cfg)
     assert len(rejected) == 0
-    torch.manual_seed(SEED)  # as run_chunk
+    torch.manual_seed(SEED) # as run_chunk
     s1 = stage1(inputs, models, cfg, SEED)
     (d, e, theta, w), _, diag = stage2(s1, inputs, models, cfg, torch_seed=SEED)
     got = dict(distance=d, ebv=cfg.law().to_ebv(e), theta=theta, weights=w, ess_norm=s1["ess_norm"],
-               **{k: diag[k] for k in ("par_valid", "frac_valid_samples_pre", "ess_frac", "ess_frac_raw",
+               **{k: diag[k] for k in ("par_valid", "frac_valid_samples_pre", "ess_frac",
                                        "n_negative_ebv_per_star", "frac_colour_clipped")})
     for k, v in got.items():
         np.testing.assert_array_equal(v.numpy(), ref[f"{name}/{k}"], err_msg=f"{name}/{k}")
