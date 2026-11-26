@@ -2,8 +2,8 @@
 
 DECIMA infers θ = ([Fe/H]_init, [α/Fe]_init, log age, EEP) for each star, plus its distance and extinction.
 θ lives on a grid of MIST v2.5 isochrones (v/v_crit = 0.4).
-Two neural posterior estimators (NPEs) and one density estimator, all trained on simulations from that grid, provide initial posteriors over θ.
-Importance sampling then refines the posterior with the photometry and parallax, and provides posteriors over distance and extinction.
+Two neural posterior estimators (NPEs) and one density estimator, all trained on simulations from that grid, give a first posterior over θ.
+Importance sampling then refines it with the photometry and parallax, and adds the posteriors over distance and extinction.
 
 The details, derivations and validation are in the DECIMA paper (in preparation). This page is the short version.
 

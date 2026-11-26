@@ -8,8 +8,8 @@ Stage 1 conditions the main NPE on the pseudo absolute magnitude
 
     M_pseudo,K = ϖ · 10^(0.2 Ks − 2) = 10^(−0.2 (M_Ks − A_Ks))
 
-The NPE was trained without extinction, so it reads M_pseudo,K as if A_Ks = 0. A reddened star then looks 10^(0.2 A_K) times
-more luminous than it is.
+The NPE was trained without extinction, so it reads M_pseudo,K as if A_Ks = 0. For a reddened star, M_pseudo,K is then
+10^(0.2 A_Ks) times too large, and the star looks more luminous than it is.
 
 Stage 2 fits the extinction and would correct this, but only by reweighting the stage-1 draws. If stage 1's proposal
 is centred on the wrong luminosity *and* is narrow, few draws land where stage 2 wants them. Stage 2 then rests on a
@@ -53,7 +53,7 @@ Otherwise the error is left as it was, and the star runs normally.
   giant without log g gets the wrong intrinsic colour, and so the wrong A_K. Pipelines that give log g (GALAH, APOGEE)
   are not affected.
 - **T_eff scale.** A_K inherits any offset between your pipeline's T_eff scale and Casagrande+21's (an IRFM scale): about
-  0.003 mag in A_K per 30 K. A pipeline running 100 K cool gives A_K about 0.01 mag too high for every star. That only
+  0.003 mag in A_K per 30 K. A pipeline whose T_eff is 100 K too cool gives A_K about 0.01 mag too high for every star. That only
   slightly over-widens the error, but turn the option off if you know your scale is far off.
 - **Only widens.** If A_K is underestimated the inflation is too small, and the star behaves as with `pseudo_mag_inflate=False`.
 
@@ -71,8 +71,8 @@ Agreement with the catalogue ages was essentially unchanged.
 
 So the gain is robustness: fewer stars where stage 2 has too few useful draws. It is not a shift in typical results.
 
-This test used an earlier proposal (pure q(θ | x), without the defensive mixture), which is itself more robust to this
-kind of mismatch. The size of the gain under the current default may be smaller.
+This test used an earlier proposal: q(θ | s, M_pseudo,K) alone, without the defensive mixture. The mixture is itself
+more robust to this kind of mismatch, so the gain under the current default may be smaller.
 
 ## Reference
 

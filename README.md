@@ -1,14 +1,19 @@
 # DECIMA
 
-DECIMA, Roman Fate that measures the length of life via a thread, or alternativaely, Distance, Extinction, and Chronometry via Isochrone Modelling, Amortised.
+Decima is the Roman Fate who measures the thread of life. DECIMA is also Distance, Extinction and Chronometry via
+Isochrone Modelling, Amortised.
 
-This is a package that infers the stellar age, distance, extinction of a star in addition to its intrinsic [Fe/H], [α/Fe] and evolutioanry stage (parametrised by the equivalent evolutionary points). The inputs are stars with spectroscopic T_eff[Fe/H], [α/Fe] (otherwise assumed to be solar), a Gaia parallax and Gaia/2MASS photometry.
+DECIMA infers a star's age, distance and extinction, together with its initial [Fe/H], [α/Fe] and evolutionary stage
+(parametrised by the equivalent evolutionary point, EEP). It needs spectroscopic T_eff and [Fe/H] (and [α/Fe], which is
+otherwise assumed solar), a Gaia parallax, and Gaia and 2MASS photometry.
 
-DECIMA works in 2 stages:
-1. Neural posterior estimation of distance-independent parameters from spectroscopy and a parallax-based pseudo-magnitude with noise handled at inference time.
-2. Importance sampling that folds in every avaialble photometric band, the exact parallax likelihood, priors and/or log g
+DECIMA works in two stages:
+1. Neural posterior estimation of the distance-independent parameters from the spectroscopy and a parallax-based
+   pseudo-magnitude. Measurement noise is handled at inference time.
+2. Importance sampling that folds in every available photometric band, the exact parallax likelihood, the priors and,
+   optionally, the spectroscopic log g.
 
-It is very fast, runs at about 0.04s per star per GPU core.
+It is fast: about 0.04 s per star per GPU core.
 How it works: [docs/method.md](docs/method.md).
 
 ## Install
@@ -21,7 +26,7 @@ uv sync                 # or: pip install -e .
 Python ≥ 3.10.
 
 The trained models (≈0.25 GB) are not downloadable yet. Point `DECIMA_DATA_DIR` at a directory holding `npe.pt`,
-`npe_spec.pt`, `prior_spec.pt` and `grid.npz`. 
+`npe_spec.pt`, `prior_spec.pt` and `grid.npz`.
 
 On linnunrata (internal only for now):
 
@@ -122,7 +127,7 @@ DECIMA can be run on any star with the required inputs.
 | [Fe/H] | −4 to +0.5 |
 | [α/Fe] | −0.2 to +0.6 |
 | age | 10⁵ yr to 20 Gyr (uniform in linear age) |
-| EEP | ZAMS (202) to end of core-He burning (706) |
+| EEP | ZAMS (202) to end of core-He burning (707) |
 
 So the training covers the main sequence, turn-off, subgiant branch, red giant branch, red clump and horizontal branch.
 
@@ -135,50 +140,7 @@ So the training covers the main sequence, turn-off, subgiant branch, red giant b
 
 **Known weaknesses:**
 - **Binaries:** unresolved binaries are not modelled.
-- For Xiang+24 LAMOST catalog, the failure rate is 0.1%.
-
-
-## GALAH and APOGEE
-
-Column maps are in [examples/columns/](examples/columns). Each assumes the preparation below.
-
-**APOGEE DR17** (`allStar-dr17-synspec_rev1.fits`):
-
-```python
-import json
-import numpy as np
-from astropy.table import Table
-import decima
-
-t = Table.read("allStar-dr17-synspec_rev1.fits", hdu=1)
-t = t[(t["EXTRATARG"] == 0) & ((t["ASPCAPFLAG"] & 2**23) == 0) # main sample, not STAR_BAD
-      & (t["TEFF"] > 0) & (t["FE_H"] > -6)]
-for b in ("J", "H", "K"):
-    t[b][t[b] > 50] = np.nan # 99 = not measured
-t["ALPHA_FE"] = t["ALPHA_M"] + t["M_H"] - t["FE_H"] # APOGEE gives [α/M], not [α/Fe]
-t["PARALLAX_ZPC"] = t["GAIAEDR3_PARALLAX"] + 0.017 # crude global zero-point; better: Lindegren+21
-cfg = decima.Config(missing_err=0) # no Gaia mag errors: use the 0.02 mag floor
-summary, samples, rejected = decima.infer(t, columns=json.load(open("examples/columns/apogee_dr17.json")), config=cfg)
-```
-
-**GALAH DR4:**
-- **BP/RP:** join `galah_dr4_allstar_240705` with `galah_dr4_vac_wise_tmass_gaiadr3_240705` on `sobject_id`, for BP, RP
-  and the Gaia magnitude errors.
-- **Quality cuts:** `flag_sp == 0` and `snr_px_ccd3 > 30`.
-- **[α/Fe]:** DR4 has no combined [α/Fe] column. The column map uses [Si/Fe] (`si_fe`, the α tracer of the models);
-  mask it where `flag_si_fe != 0`. Stars without it get the default 0 ± 0.2.
-- **Parallax:** the DR4 parallax may already be zero-point corrected. Check before correcting it again.
-
-**GALAH DR3:**
-- **Gaia data:** join `GALAH_DR3_main_allstar_v2` with `GALAH_DR3_VAC_GaiaEDR3` on `sobject_id`. The main table has
-  only Gaia DR2 astrometry.
-- **Parallax:** use the VAC's `parallax_corr` (Lindegren zero-point applied).
-- **Quality cuts:** `flag_sp == 0`, `flag_fe_h == 0`, `flag_alpha_fe == 0` and `snr_c3_iraf > 30`.
-- **Gaia magnitude errors:** there are none, so use `Config(missing_err=0)` as for APOGEE.
-
-**For both surveys:**
-- **Giants:** most of these stars are giants, which is outside the real-data validation above.
-
+- **Failures:** on the Xiang+24 catalogue, 0.1% of stars fail (see Output above).
 
 ## Development
 

@@ -61,7 +61,7 @@ full config (`CONFIG`, as JSON).
 ## When to distrust a star
 
 **Failed stars** (`failed = True`):
-- no stage-1 draw was usable at all. Its percentiles and samples are NaN.
+- either no stage-1 draw was usable at all, and its percentiles and samples are NaN;
 - or its age posterior has no width on one side of the median: the 16th or the 84th percentile equals the median.
   This happens when a few draws carry all the weight.
 
@@ -72,7 +72,7 @@ posterior draws behind a star's result. A low ESS means the photometry and paral
 predicts, so look at those stars before using them. Typical causes:
 - a binary;
 - a bad magnitude;
-- a T_eff or [Fe/H] off-scale;
+- a T_eff or [Fe/H] that is wrong, or on a different scale from the models;
 - high extinction.
 
 ## Resuming and re-running
