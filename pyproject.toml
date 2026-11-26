@@ -11,7 +11,7 @@ dependencies = [
     "torch>=2.5",
     "sbi>=0.27,<0.28",  # the flows are rebuilt with sbi's builders (decima.models)
     "nflows",
-    "zuko",
+    "zuko>=1.5,<1.6",  # zuko 1.6 renamed the base-distribution buffers (net.base._0/_1 -> loc/scale): prior_spec.pt no longer loads
     "astropy",
     "healpy",
     "h5py",

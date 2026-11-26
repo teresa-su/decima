@@ -826,7 +826,7 @@ requires-dist = [
     { name = "pooch" },
     { name = "sbi", specifier = ">=0.27,<0.28" },
     { name = "torch", specifier = ">=2.5" },
-    { name = "zuko" },
+    { name = "zuko", specifier = ">=1.5,<1.6" },
 ]
 provides-extras = ["zeropoint"]
 
