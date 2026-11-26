@@ -26,14 +26,15 @@ XIANG_COLUMNS = {
     "alpha_fe": "ALPHA_FE", "alpha_fe_error": "E_ALPHA_FE",
 }
 ALL = ("G", "BP", "RP", "J", "H", "Ks")
-# the configs of isosbi's export_decima.REF_CONFIGS; the reference draws are per star (stars_per_batch=1) unless set
-B1 = dict(stars_per_batch=1)
+# the configs of isosbi's export_decima.REF_CONFIGS; the reference draws are per star (stars_per_batch=1) unless set,
+# and without the A_K inflation unless set
+B1 = dict(stars_per_batch=1, ak_inflate=False)
 CONFIGS = {
     "default": Config(**B1),
     "a0_ss2018_logg_trunc": Config(extinction="SS2018", use_logg=True, **B1, advanced=Advanced(mixture_alpha=0.0, truncate=True)),
-    "a05_f19teff_bands_batch": Config(extinction="F19_TEFF", bands=("G", "J", "Ks"), stars_per_batch=5,
+    "a05_f19teff_bands_batch": Config(extinction="F19_TEFF", bands=("G", "J", "Ks"), stars_per_batch=5, ak_inflate=False,
                                       advanced=Advanced(mixture_alpha=0.5)),
-    "a1_wc2019_noimf_ceiling_ak": Config(extinction="WC2019", ak_inflate=True, **B1,
+    "a1_wc2019_noimf_ceiling_ak": Config(extinction="WC2019", **dict(B1, ak_inflate=True),
                                          advanced=Advanced(mixture_alpha=1.0, imf_prior=False, npe_ratio_ceiling=0.95)),
     "none_grey": Config(extinction="none", **B1),
     "f19_grey": Config(bands=("BP", "RP", "H", "Ks"), **B1, advanced=Advanced(grey=0.1)),

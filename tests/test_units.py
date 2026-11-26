@@ -53,7 +53,7 @@ def test_read_formats_and_column_map(tmp_path, ext):
 
 
 def test_build_inputs_rejects_and_fills():
-    inputs, rejected = build_inputs(ROWS, Config(bands=("BP", "Ks")))
+    inputs, rejected = build_inputs(ROWS, Config(bands=("BP", "Ks"), ak_inflate=False))
     assert list(rejected["row"]) == [1, 2] and list(rejected["reason"]) == ["parallax_error <= 0", "no feh"]
     assert len(inputs) == 1 and inputs.x_obs[0, 1] == 0.0 and np.isclose(inputs.x_obs_err[0, 1], 0.15)
     assert inputs.m_stds[0, 0] == pytest.approx(0.02)  # BP error floored
