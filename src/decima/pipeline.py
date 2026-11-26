@@ -39,16 +39,17 @@ class Advanced:
 @dataclass
 class Config:
     """Every setting that changes the result. Saved as config.json next to a run's output."""
-    n_latent_x: int = 100           # latent (noise-free) observables drawn per star in stage 1
-    n_theta: int = 60               # theta draws per latent observable
-    n_keep: int = 100               # posterior samples kept per star (of n_latent_x * n_theta)
+    n_latent_x: int = 800           # latent (noise-free) observables drawn per star in stage 1
+    n_theta: int = 10               # theta draws per latent observable
+    n_keep: int = 1000               # posterior samples kept per star (of n_latent_x * n_theta)
     percentiles: tuple = (5, 16, 50, 84, 95)
     bands: tuple = BANDS            # any subset of G, BP, RP, J, H, Ks that includes Ks
     extinction: Union[str, ExtinctionLaw] = "F19"  # a name from extinction.EXTINCTION_LAWS, or a law object
     ak_inflate: bool = False        # inflate the pseudo abs-mag error by the Casagrande+21 A_K estimate (decima.ak)
     use_logg: bool = False          # add the spectroscopic log g likelihood in stage 2
     device: str = "cpu"
-    stars_per_batch: int = 1        # stars per stage-1 flow call (1: per-star seeds; ~100 on a GPU)
+    stars_per_batch: int = 100      # stars per stage-1 flow call; 1 seeds each star on its own (draws then
+                                    # do not depend on the other stars), at ~2.5x the CPU time
     seed: int = 22
     advanced: Advanced = field(default_factory=Advanced)
 

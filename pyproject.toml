@@ -9,8 +9,7 @@ requires-python = ">=3.10"
 dependencies = [
     "numpy",
     "torch>=2.5",
-    "sbi>=0.25,<0.26",  # the flows are rebuilt with sbi's builders (decima.models)
-    "arviz<1",          # sbi 0.25 imports arviz.data, gone in arviz 1
+    "sbi>=0.27,<0.28",  # the flows are rebuilt with sbi's builders (decima.models)
     "nflows",
     "zuko",
     "astropy",
@@ -33,8 +32,8 @@ packages = ["src/decima"]
 dev = ["pytest"]
 
 [tool.uv]
-# The regression test compares against isosbi bit for bit, so the dev env uses isosbi's versions.
-constraint-dependencies = ["torch==2.5.1", "sbi==0.25.0", "nflows==0.14", "zuko==1.5.0", "numpy==2.2.6"]
+# The regression test compares against isosbi (sbi 0.25) bit for bit; these versions pass it.
+constraint-dependencies = ["torch==2.5.1", "sbi==0.27.0", "nflows==0.14", "zuko==1.5.0", "numpy==2.2.6"]
 
 [tool.pytest.ini_options]
 markers = ["slow: needs the full models (DECIMA_DATA_DIR) and a few minutes of CPU"]
