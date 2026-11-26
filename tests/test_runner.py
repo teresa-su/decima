@@ -1,5 +1,4 @@
 """decima.run: the result does not depend on the number of workers, survives an interrupted run, and equals infer."""
-import os
 from pathlib import Path
 
 import h5py
@@ -9,9 +8,10 @@ import torch
 from astropy.table import Table
 
 import decima
+from decima.models import data_dir
 from test_regression import XIANG_COLUMNS
 
-pytestmark = pytest.mark.skipif(not os.environ.get("DECIMA_DATA_DIR"), reason="needs DECIMA_DATA_DIR")
+pytestmark = pytest.mark.skipif(data_dir() is None, reason="needs the models (DECIMA_DATA_DIR)")
 STARS = Path(__file__).parent / "data" / "reference_stars.ecsv"
 CFG = decima.Config(n_latent_x=20, n_theta=10, n_keep=5)
 

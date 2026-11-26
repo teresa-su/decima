@@ -20,14 +20,7 @@ uv sync                 # or: pip install -e .
 
 Python ≥ 3.10.
 
-The trained models (≈0.25 GB) are not downloadable yet. Point `DECIMA_DATA_DIR` at a directory holding `npe.pt`,
-`npe_spec.pt`, `prior_spec.pt` and `grid.npz`.
-
-On linnunrata (internal only for now):
-
-```bash
-export DECIMA_DATA_DIR=/export/linnunrata/tsu/decima/models
-```
+The trained models (≈0.25 GB) are not downloadable yet.
 
 ## Quick start
 
@@ -132,8 +125,8 @@ So the training covers the main sequence, turn-off, subgiant branch, red giant b
 
 ```bash
 uv sync
-uv run pytest # fast tests (the model-dependent ones are skipped)
-DECIMA_DATA_DIR=/path/to/models uv run pytest # plus the regression against the reference outputs (~1 min)
+uv run pytest # all tests on linnunrata (~1 min); elsewhere the model-dependent ones are skipped
+DECIMA_DATA_DIR=/path/to/models uv run pytest # all tests, models elsewhere
 ```
 
 ## Licence

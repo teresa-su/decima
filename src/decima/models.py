@@ -11,7 +11,7 @@ The two NPEs are trained on, sample and score the transformed theta_tilde (logit
 
 Each .pt is a plain dict {"arch": builder kwargs, "state_dict": weights, "prior_loc"/"prior_scale" (posteriors)}, so
 it loads with `torch.load(weights_only=True)` and does not depend on pickled classes. The files are looked up in
-$DECIMA_DATA_DIR if set, else (once the release is online; see REGISTRY) downloaded once into pooch's cache.
+$DECIMA_DATA_DIR if set.
 """
 import os
 from dataclasses import dataclass
@@ -29,14 +29,24 @@ from decima.theta import ThetaTransformer
 MODEL_VERSION = "v1"
 # file -> (url, sha256). shortcut: filled in once the files are on Zenodo; until then set DECIMA_DATA_DIR.
 REGISTRY = {name: (None, None) for name in ("npe.pt", "npe_spec.pt", "prior_spec.pt", "grid.npz")}
+# shortcut: the internal copy, used when DECIMA_DATA_DIR is unset so linnunrata users need no setup. Remove once the
+# release is on Zenodo.
+LINNUNRATA_DIR = Path("/export/linnunrata/tsu/decima/models")
+
+
+def data_dir() -> Path | None:
+    """The local model directory: $DECIMA_DATA_DIR, else LINNUNRATA_DIR if it exists, else None (download)."""
+    if os.environ.get("DECIMA_DATA_DIR"):
+        return Path(os.environ["DECIMA_DATA_DIR"])
+    return LINNUNRATA_DIR if LINNUNRATA_DIR.is_dir() else None
 
 
 def fetch(name: str) -> Path:
-    """Local path of model file `name`: $DECIMA_DATA_DIR/name, or the cached download."""
-    if os.environ.get("DECIMA_DATA_DIR"):
-        path = Path(os.environ["DECIMA_DATA_DIR"]) / name
+    """Local path of model file `name`: data_dir()/name, or the cached download."""
+    if (d := data_dir()) is not None:
+        path = d / name
         if not path.exists():
-            raise FileNotFoundError(f"{path} not found (DECIMA_DATA_DIR={os.environ['DECIMA_DATA_DIR']})")
+            raise FileNotFoundError(f"{path} not found (set DECIMA_DATA_DIR to the directory holding the models)")
         return path
     url, sha256 = REGISTRY[name]
     if url is None:
@@ -88,7 +98,7 @@ class Models:
 
 
 def load_models(device: str = "cpu") -> Models:
-    """Load the flows and the grid (from $DECIMA_DATA_DIR; see `fetch`). With device="cuda" both stages run on the GPU;
+    """Load the flows and the grid (from data_dir(); see `fetch`). With device="cuda" both stages run on the GPU;
     draws then differ from a CPU run (other RNG stream)."""
     load = lambda name: torch.load(fetch(name), weights_only=True)
     npe, npe_spec = build_posterior(load("npe.pt")), build_posterior(load("npe_spec.pt"))

@@ -1,8 +1,7 @@
 """DECIMA against the isosbi pipeline it was extracted from: identical stage-1 + stage-2 outputs, bit for bit, on CPU.
 
-The reference (tests/data) is written by isosbi's export_decima.py. Needs DECIMA_DATA_DIR (the exported models).
+Needs the exported models (see decima.models.data_dir).
 """
-import os
 from pathlib import Path
 
 import numpy as np
@@ -10,10 +9,10 @@ import pytest
 import torch
 
 from decima.io import build_inputs, read_table
-from decima.models import load_models
+from decima.models import data_dir, load_models
 from decima.pipeline import Config, run_chunk, stage1, stage2
 
-pytestmark = pytest.mark.skipif(not os.environ.get("DECIMA_DATA_DIR"), reason="needs DECIMA_DATA_DIR")
+pytestmark = pytest.mark.skipif(data_dir() is None, reason="needs the models (DECIMA_DATA_DIR)")
 
 DATA = Path(__file__).parent / "data"
 SEED = 22
