@@ -1,21 +1,21 @@
-# `ak_inflate`: widening the pseudo-magnitude error for reddened stars
+# `pseudo_mag_inflate`: widening the pseudo absolute magnitude error for reddened stars
 
-**On by default.** `Config(ak_inflate=False)` turns it off.
+**On by default.** `Config(pseudo_mag_inflate=False)` turns it off.
 
 ## The problem
 
 Stage 1 conditions the main NPE on the pseudo absolute magnitude
 
-    ϖ_K = ϖ · 10^(0.2 Ks − 2) = 10^(−0.2 (M_Ks − A_Ks))
+    M_pseudo,K = ϖ · 10^(0.2 Ks − 2) = 10^(−0.2 (M_Ks − A_Ks))
 
-The NPE was trained without extinction, so it reads ϖ_K as if A_Ks = 0. A reddened star then looks 10^(0.2 A_K) times
+The NPE was trained without extinction, so it reads M_pseudo,K as if A_Ks = 0. A reddened star then looks 10^(0.2 A_K) times
 more luminous than it is.
 
 Stage 2 fits the extinction and would correct this, but only by reweighting the stage-1 draws. If stage 1's proposal
 is centred on the wrong luminosity *and* is narrow, few draws land where stage 2 wants them. Stage 2 then rests on a
 handful of draws: low `ess_frac`, and noisy, sometimes biased results.
 
-## What `ak_inflate` does
+## What `pseudo_mag_inflate` does
 
 1. **Estimate A_K cheaply from data already in the input.**
    - The Casagrande+21 colour–T_eff relation for Gaia EDR3 BP and 2MASS Ks (their Table A1, (BP−Ks)₀) gives
@@ -24,21 +24,21 @@ handful of draws: low `ess_frac`, and noisy, sometimes biased results.
      E(BP−Ks) = (BP−Ks)_obs − (BP−Ks)₀.
    - Then A_K = 0.124 · E(BP−Ks), clipped at 0.
    - This needs no dust map and no external E(B−V).
-2. **Widen, don't correct.** The ϖ_K *error* is increased in quadrature by the fraction of ϖ_K the extinction could
+2. **Widen, don't correct.** The M_pseudo,K *error* is increased in quadrature by the fraction of M_pseudo,K the extinction could
    account for:
 
-       σ_ϖK² → σ_ϖK² + (0.2 ln 10 · ϖ_K · A_K)²
+       σ² → σ² + (0.2 ln 10 · M_pseudo,K · A_K)²
 
-   The value of ϖ_K is left alone. Stage 2 still does the actual extinction fit, with all bands. The inflation only
+   The value of M_pseudo,K is left alone. Stage 2 still does the actual extinction fit, with all bands. The inflation only
    makes the stage-1 proposal wide enough for stage 2 to work with.
 
 The estimate is noisy: σ(A_K) ≈ 0.006 mag from star to star on Xiang+24. That is small next to the A_K of the stars
 where the inflation matters, but not next to the median (≈0.017). This noise is why the estimate is used only to widen
-the error, never to correct ϖ_K.
+the error, never to correct M_pseudo,K.
 
 ## When it applies
 
-A star's error is inflated (`ak_inflated = True` in the summary) only when all of these hold:
+A star's error is inflated (`pseudo_mag_inflated = True` in the summary) only when all of these hold:
 - BP and Ks are both present.
 - BP > 5 and G > 6 (brighter stars are saturated in Gaia).
 - The relation has a solution with (BP−Ks)₀ in [0.30, 4.20] that reproduces the star's T_eff to within 1 K. In practice
@@ -48,12 +48,14 @@ Otherwise the error is left as it was, and the star runs normally.
 
 ## Caveats
 
-- **log g.** A missing log g is filled with 4.0, a dwarf/subgiant value. For a giant with no log g, the intrinsic colour,
-  and so A_K, will be off. Pipelines that give log g (GALAH, APOGEE) are not affected.
+- **Giants and log g.** The Casagrande+21 relation covers giants as well as dwarfs: log g is one of its terms, so a giant
+  with a measured log g is handled correctly. Only a *missing* log g is filled with the dwarf/subgiant value 4.0, so a
+  giant without log g gets the wrong intrinsic colour, and so the wrong A_K. Pipelines that give log g (GALAH, APOGEE)
+  are not affected.
 - **T_eff scale.** A_K inherits any offset between your pipeline's T_eff scale and Casagrande+21's (an IRFM scale): about
   0.003 mag in A_K per 30 K. A pipeline running 100 K cool gives A_K about 0.01 mag too high for every star. That only
   slightly over-widens the error, but turn the option off if you know your scale is far off.
-- **Only widens.** If A_K is underestimated the inflation is too small, and the star behaves as with `ak_inflate=False`.
+- **Only widens.** If A_K is underestimated the inflation is too small, and the star behaves as with `pseudo_mag_inflate=False`.
 
 ## Evidence
 

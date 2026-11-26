@@ -1,12 +1,12 @@
 # Extinction laws
 
-For every stage-1 draw, stage 2 fits a distance modulus μ and one extinction value E′ to the apparent magnitudes:
+For every stage-1 draw, stage 2 fits a distance modulus μ and one extinction value E to the apparent magnitudes:
 
-    m_b − M_b(θ) = μ + R_b E′
+    m_b − M_b(θ) = μ + R_b E
 
-The extinction law supplies R_b, the extinction in band b per unit E′.
+The extinction law supplies R_b, the extinction in band b per unit E.
 
-| Kind of law | E′ is | Output column |
+| Kind of law | E is | Output column |
 |---|---|---|
 | Fixed laws | E(B−V) | `ebv` |
 | Colour-dependent laws | A0, the monochromatic extinction at 550 nm | `A0` |
@@ -15,27 +15,21 @@ Choose a law with `Config(extinction=...)`.
 
 ## Built-in laws
 
-| Name | Kind | E′ | Source |
+| Name | Kind | E | Source |
 |---|---|---|---|
 | `F19` (default) | colour-dependent, X = (BP−RP)₀ | A0 | Gaia EDR3 extinction coefficients for the Fitzpatrick+19 curve ("top of the HRD" fit) |
 | `F19_TEFF` | colour-dependent, X = T_eff / 5040 K | A0 | the same, as a function of T_eff |
 | `SS2018` | fixed | E(B−V) | Schlafly & Finkbeiner (2018)-type R_b |
 | `WC2019` | fixed | E(B−V) | Wang & Chen (2019) |
-| `none` | R_b = 0 | — | No extinction: stage 2 fits μ alone. For mock stars. |
+| `none` | R_b = 0 | — | No extinction: stage 2 fits the distance alone, and gives no extinction estimate. For mock stars. |
 
-## Why colour-dependent?
-
-Broad bands are not monochromatic. How much a band dims under a given amount of dust depends on the shape of the star's
-spectrum under that band, so a cool red giant and a hot turn-off star behind the same dust lose different amounts of G
-or BP. The effect is largest in the wide Gaia bands and grows with the extinction itself (the spectrum's shape changes as
-it is reddened).
+## Colour-dependent laws
 
 A fixed law uses one R_b per band for every star. A colour-dependent law gives each band a coefficient
 
     k_b = A_b / A0 = c₀ + c₁X + c₂X² + c₃X³ + c₄A + c₅A² + c₆A³ + c₇XA + c₈AX² + c₉XA²
 
 where A = A0, and X is the *intrinsic* colour (or T_eff) of the draw being weighted, taken from the noise-free isochrone.
-X depends on the draw, not on the observed colour, so the coefficient follows each hypothesis about the star.
 Because k_b depends on A0, the value being fitted, stage 2 fits once with k_b at A0 = 0, then refits once with k_b at
 the fitted A0.
 
@@ -48,22 +42,9 @@ star is outside the law's calibrated colours.
 
 To convert, E(B−V) = A0 / 3.1.
 
-### Does it matter?
+## Grey component
 
-On 2000 single Xiang+24 stars (LAMOST turn-off and subgiants, mostly low extinction), F19 against the fixed WC2019 law
-moved:
-
-| Quantity | WC2019 | F19 |
-|---|---|---|
-| Median age offset vs the catalogue | +0.17 Gyr | +0.04 Gyr |
-| E(B−V) offset | −0.009 | −0.003 |
-
-Other numbers barely changed. The difference should grow for reddened and very red or very blue stars. It has not been
-validated at high extinction.
-
-## Grey offset
-
-`Advanced(grey=0.1)` adds 0.1 to every R_b of a *built-in* law. It is a sensitivity test, not a physical setting.
+`Config(grey=0.1)` adds a grey extinction component of 0.1 to every R_b of a *built-in* law.
 
 ## Your own law
 

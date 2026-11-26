@@ -61,17 +61,18 @@ a JSON file of the same mapping with `--columns` on the shell.
 | | Columns |
 |---|---|
 | **required** | `parallax`, `parallax_error` [mas]; `teff`, `teff_error` [K]; `feh`, `feh_error` [dex]; `Ks`, `Ks_error` [mag] |
-| **position** | `ra`, `dec` [deg, ICRS] for the distance prior, unless per-star `L`, `alpha`, `beta` are given |
+| **position** | `ra`, `dec` [deg, ICRS] for the distance prior, unless per-star `L`, `alpha`, `beta` are given; stars with neither are rejected |
 | optional | `id`; `alpha_fe`, `alpha_fe_error`; `logg`, `logg_error`; `G`, `BP`, `RP` (Gaia EDR3/DR3), `J`, `H` (2MASS), each with `_error` |
+| zero-point | `nu_eff_used_in_astrometry`, `pseudocolour`, `ecl_lat`, `astrometric_params_solved` (Gaia archive names), only with `parallax_zero_point=True` |
 
-- **Parallax:** used as given. Apply the Gaia zero-point correction yourself first.
+- **Parallax:** used as given, or with `Config(parallax_zero_point=True)` DECIMA subtracts the Lindegren+21 zero-point
+  itself ([details](docs/settings.md#the-parallax-zero-point)).
 - **Missing values:** NaN or masked.
   - A missing magnitude means that band is skipped for that star.
   - A magnitude with no error gets a 0.5 mag error.
-  - A missing [α/Fe] is filled with 0 ± 0.15 by default.
-- **Rejected stars:** stars without a required value, or with `parallax_error ≤ 0`, are not run. They are listed in
+  - A missing [α/Fe] is filled with 0 ± 0.2 by default.
+- **Rejected stars:** stars without a required value or a position, or with `parallax_error ≤ 0`, are not run. They are listed in
   `rejected` with the reason.
-- **Spectroscopic errors** are used exactly as given. If your pipeline's errors are internal precisions, inflate them first.
 
 ## Settings
 
@@ -80,32 +81,35 @@ to edit and pass back with `--config cfg.json`. Full details: [docs/settings.md]
 
 | Setting | Default | |
 |---|---|---|
-| `n_latent_x`, `n_theta` | 800, 10 | Stage-1 draws per star: latent observables × θ per observable. Chosen by a convergence test. |
+| `n_latent_x`, `n_theta` | 800, 10 | Stage-1 draws per star: latent observables (the Monte Carlo sample over the noise) × θ per observable |
 | `n_keep` | 400 | Posterior samples saved per star |
+| `seed` | 22 | Random seed for every draw: the same inputs and seed give the same results |
 | `bands` | G BP RP J H Ks | Bands used in stage 2. Any subset that includes Ks. |
 | `extinction` | `"F19"` | Extinction law. Colour-dependent by default. **[docs/extinction.md](docs/extinction.md)** |
-| `ak_inflate` | `True` | Widen the parallax pseudo-magnitude error for reddened stars to aid Stage 1 sampling. **[docs/ak-inflate.md](docs/ak-inflate.md)** |
+| `pseudo_mag_inflate` | `True` | Widen the pseudo absolute magnitude error for reddened stars to aid stage-1 sampling. **[docs/pseudo-mag-inflate.md](docs/pseudo-mag-inflate.md)** |
+| `parallax_zero_point` | `False` | Subtract the Lindegren+21 Gaia parallax zero-point |
 | `use_logg` | `False` | Include the spectroscopic log g in stage 2 |
 | `device` | `"cpu"` | or `"cuda"` |
 | `stars_per_batch` | 100 | Stars per flow call (memory vs speed) |
-| `seed` | 22 | Random seed |
-| `advanced` | `Advanced()` | Method settings: defensive-mixture fraction, IMF prior, photometric error floors, … Their defaults are the validated ones. |
+
+Plus the method settings (`mixture_alpha`, `npe_ratio_ceiling`, `imf_prior`, `grey`, `parallax_snr_min`) and the input
+error floors and fills: all in [docs/settings.md](docs/settings.md).
 
 ## Output
 
 - **`summary`:** one row per star.
-  - Percentiles (5, 16, 50, 84, 95) of `feh`, `alpha_fe`, `log_age`, `age` [Gyr], `eep`, `distance` [pc] and the
-    extinction (`A0` for the F19 laws, `ebv` for fixed laws).
-  - Quality diagnostics, of which **`ess_frac`** is the main one.
+  - Percentiles (5, 16, 50, 84, 95) of `feh_init`, `alpha_fe_init` (the model's initial abundances), `log_age`,
+    `age` [Gyr], `eep`, `distance` [pc] and the extinction (`A0` for the F19 laws, `ebv` for fixed laws).
+  - Quality flags and diagnostics: **`failed`** and **`ess_frac`** are the main ones.
   - Per-band flags.
 - **`samples`:** (n_stars, n_keep, 7) unweighted posterior draws, in the order `decima.quantity_names(cfg)`.
 - **`rejected`:** input rows that could not be run, and why.
 
 `decima run` writes `summary.fits`, `samples.h5` and `rejected.ecsv` into the run directory.
 
-**What each column means and when to distrust a star: [docs/outputs.md](docs/outputs.md).** In short, an `ess_frac`
-below ≈0.0125 (fewer than ≈100 effective draws) means the photometry and parallax disagree with the spectroscopy. Look
-at those stars before using them.
+**Failed stars** have `failed = True`: either no stage-1 draw was usable (percentiles NaN), or the age posterior has no
+width on one side of the median (its 16th or 84th percentile equals the median). Don't use their results. What every
+column means, and other warning signs: [docs/outputs.md](docs/outputs.md).
 
 ## Validated domain and known limitations
 
@@ -153,7 +157,7 @@ for b in ("J", "H", "K"):
     t[b][t[b] > 50] = np.nan # 99 = not measured
 t["ALPHA_FE"] = t["ALPHA_M"] + t["M_H"] - t["FE_H"] # APOGEE gives [α/M], not [α/Fe]
 t["PARALLAX_ZPC"] = t["GAIAEDR3_PARALLAX"] + 0.017 # crude global zero-point; better: Lindegren+21
-cfg = decima.Config(advanced=decima.Advanced(missing_err=0)) # no Gaia mag errors: use the 0.02 mag floor
+cfg = decima.Config(missing_err=0) # no Gaia mag errors: use the 0.02 mag floor
 summary, samples, rejected = decima.infer(t, columns=json.load(open("examples/columns/apogee_dr17.json")), config=cfg)
 ```
 
@@ -161,8 +165,8 @@ summary, samples, rejected = decima.infer(t, columns=json.load(open("examples/co
 - **BP/RP:** join `galah_dr4_allstar_240705` with `galah_dr4_vac_wise_tmass_gaiadr3_240705` on `sobject_id`, for BP, RP
   and the Gaia magnitude errors.
 - **Quality cuts:** `flag_sp == 0` and `snr_px_ccd3 > 30`.
-- **[α/Fe]:** DR4 has no combined [α/Fe] column, so without one DR4 stars get the default 0 ± 0.15. You can build one
-  from the individual elements.
+- **[α/Fe]:** DR4 has no combined [α/Fe] column. The column map uses [Si/Fe] (`si_fe`, the α tracer of the models);
+  mask it where `flag_si_fe != 0`. Stars without it get the default 0 ± 0.2.
 - **Parallax:** the DR4 parallax may already be zero-point corrected. Check before correcting it again.
 
 **GALAH DR3:**
@@ -170,11 +174,9 @@ summary, samples, rejected = decima.infer(t, columns=json.load(open("examples/co
   only Gaia DR2 astrometry.
 - **Parallax:** use the VAC's `parallax_corr` (Lindegren zero-point applied).
 - **Quality cuts:** `flag_sp == 0`, `flag_fe_h == 0`, `flag_alpha_fe == 0` and `snr_c3_iraf > 30`.
-- **Gaia magnitude errors:** there are none, so use `Advanced(missing_err=0)` as for APOGEE.
+- **Gaia magnitude errors:** there are none, so use `Config(missing_err=0)` as for APOGEE.
 
 **For both surveys:**
-- **Spectroscopic errors:** the quoted T_eff and [Fe/H] errors are internal precisions. Add a systematic term in
-  quadrature.
 - **Giants:** most of these stars are giants, which is outside the real-data validation above.
 
 
