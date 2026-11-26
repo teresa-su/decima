@@ -93,7 +93,6 @@ def _sample_and_log_prob_batched(posterior: DirectPosterior, n_samples: int, x: 
     """`n_samples` draws of the NPE's (transformed) theta for every row of `x`, with their log q(theta | x).
 
     Returns samples (n_samples, n_obs, n_params) and log_probs (n_samples, n_obs). `x` must have the flow's dtype.
-    Unlike `posterior.sample_batched` this does not reject draws outside the prior support; it raises instead.
     """
     estimator = posterior.posterior_estimator
     estimator.eval()
@@ -125,8 +124,7 @@ def _sample_and_log_prob_batched(posterior: DirectPosterior, n_samples: int, x: 
 def _draw_theta_tilde(npe: DirectPosterior, n_samples: int, x: torch.Tensor, seed: int):
     """`_sample_and_log_prob_batched` in the dtype of `x`, redrawn in float64 if the float32 spline inverse fails.
 
-    nflows' rational-quadratic spline asserts that a discriminant is non-negative, and float32 rounding can break
-    that for an outlying context. The whole batch is then redrawn with the flow cast to float64, and cast back.
+    nflows' rational-quadratic spline asserts that a discriminant is non-negative, and float32 rounding can break that for an outlying context. The whole batch is then redrawn with the flow cast to float64, and cast back.
     """
     try:
         return _sample_and_log_prob_batched(npe, n_samples, x)
@@ -144,7 +142,7 @@ def _log_q_theta_s(npe: DirectPosterior, theta_tilde: torch.Tensor, context: tor
 
     theta_tilde (n_stars, n_draws, n_params): draw k belongs to latent observable k // `n_theta`.
     context (n_stars, n_latent_x, n_context): s_i for q(theta | s), or x_i for q(theta | x).
-    Returns (n_stars, n_draws) in the dtype of `theta_tilde` (which must be that of `npe`).
+    Returns (n_stars, n_draws) in the dtype of `theta_tilde`.
     """
     n_stars, n_draws, n_params = theta_tilde.shape
     theta = theta_tilde.reshape(-1, n_params)
@@ -380,11 +378,9 @@ def _bivariate_gls(m_obs, m_err, M_iso, R_b, band_valid):
     """GLS fit of beta = (mu, E') for every (star, draw) from m_b - M_b = mu + R_b E'.
 
     m_obs, m_err (n_bands, n_stars, 1); M_iso, band_valid (n_bands, n_stars, n_draws); R_b (n_bands, 1, 1) or
-    (n_bands, n_stars, n_draws). The 2x2 normal equations are summed and solved in float64: the 1e-6 ridge on draws with
-    < 2 bands is below float32 precision.
+    (n_bands, n_stars, n_draws). The 2x2 normal equations are summed and solved in float64: the 1e-6 ridge on draws with < 2 bands is below float32 precision.
 
-    Returns theta_hat (n_stars, n_draws, 2) and its covariance theta_cov (..., 2, 2), both float64, then chi2 at the fit,
-    the number of valid bands and log det(theta_cov), in the dtype of `M_iso`.
+    Returns theta_hat (n_stars, n_draws, 2) and its covariance theta_cov (..., 2, 2), both float64, then chi2 at the fit, the number of valid bands and log det(theta_cov), in the dtype of `M_iso`.
     """
     f64 = torch.float64
     # zero missing bands before multiplying (0 * NaN = NaN); a per-draw R_b is NaN where the isochrone colour is
@@ -432,8 +428,7 @@ def _univariate_gls(m_obs, m_err, M_iso, band_valid):
 def _sample_truncated_bivariate_normal(theta_hat, theta_cov, eps: float = 1e-12, out_dtype=torch.float32):
     """Exact draw of (mu, E') from N(theta_hat, theta_cov) truncated to E' >= 0.
 
-    E' is drawn by inverse CDF in float64 (the tail is sensitive), then mu from its conditional normal. Returns mu, E'
-    and log Z (log of the probability mass kept by the truncation), each (n_stars, n_draws) in `out_dtype`.
+    E' is drawn by inverse CDF in float64 (the tail is sensitive), then mu from its conditional normal. Returns mu, E' and log Z (log of the probability mass kept by the truncation), each (n_stars, n_draws) in `out_dtype`.
     """
     mu_hat, e_hat = theta_hat[..., 0], theta_hat[..., 1]
     var_mu, cov_mue = theta_cov[..., 0, 0], theta_cov[..., 0, 1]

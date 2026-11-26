@@ -3,16 +3,14 @@
 Any format astropy reads (FITS, CSV, ECSV, VOTable, HDF5, Parquet, ...), an astropy Table or a pandas DataFrame.
 Canonical column names; pass `columns={"teff": "TEFF", ...}` (canonical -> yours) for a table that names them differently:
 
-    required   parallax, parallax_error [mas]; teff, teff_error [K]; feh, feh_error; Ks, Ks_error [mag]
+    required: parallax, parallax_error [mas]; teff, teff_error [K]; feh, feh_error; Ks, Ks_error [mag]
     position   ra, dec [deg, ICRS] for the Bailer-Jones+21 distance prior, unless L, alpha, beta are given per star
-    optional   id; alpha_fe, alpha_fe_error; logg, logg_error; G, BP, RP, J, H and their _error columns
+    
+    optional: id; alpha_fe, alpha_fe_error; logg, logg_error; G, BP, RP, J, H and their _error column
 
-Parallaxes are used as given: correct them for the Gaia zero-point first. Magnitudes are Gaia (E)DR3 G, BP, RP and 2MASS
-J, H, Ks; masked or NaN means not measured, and that band is skipped for the star. Errors are floored
-(`Advanced.gaia_err_floor`, `twomass_err_floor`); a magnitude without an error gets `Advanced.missing_err`. A missing
-[alpha/Fe] (or its error) is filled with `Advanced.alpha_fe_fill` +- `alpha_fe_err_fill`. Stars without one of the
-required values are not run; `build_inputs` returns them with the reason.
+Parallaxes are used as given: correct them for the Gaia zero-point first. Magnitudes are Gaia (E)DR3 G, BP, RP and 2MASS J, H, Ks; masked or NaN means not measured, and that band is skipped for the star. Errors are floored (`Advanced.gaia_err_floor`, `twomass_err_floor`); a magnitude without an error gets `Advanced.missing_err`. A missing [alpha/Fe] (or its error) is filled with `Advanced.alpha_fe_fill` +- `alpha_fe_err_fill`. Stars without one of the required values are not run; `build_inputs` returns them with the reason.
 """
+
 import numpy as np
 import torch
 from astropy.table import Table
@@ -23,9 +21,7 @@ from decima.extinction import BANDS
 from decima.pipeline import Config, StarInputs
 
 REQUIRED = ("Ks", "feh", "feh_error", "teff", "teff_error", "parallax", "parallax_error")
-COLUMNS = ("id", "ra", "dec", "parallax", "parallax_error", "teff", "teff_error", "feh", "feh_error", "alpha_fe",
-           "alpha_fe_error", "logg", "logg_error", "L", "alpha", "beta",
-           *BANDS, *(f"{b}_error" for b in BANDS))
+COLUMNS = ("id", "ra", "dec", "parallax", "parallax_error", "teff", "teff_error", "feh", "feh_error", "alpha_fe", "alpha_fe_error", "logg", "logg_error", "L", "alpha", "beta", *BANDS, *(f"{b}_error" for b in BANDS))
 _GAIA = ("G", "BP", "RP")
 
 
@@ -90,13 +86,13 @@ def build_inputs(tab: Table, cfg: Config):
     log_teff = np.log10(teff)
     log_teff_err = c("teff_error") / (teff * np.log(10))
 
-    # Pseudo absolute magnitude: parallax * 10^(0.2 Ks - 2) = 10^(-0.2 M_K) [parallax in mas], with its error from the
-    # parallax and Ks. Kept in numpy until the final cast (torch * numpy would silently upcast to float64).
+    # prepare pseudo absolute magnitude: parallax * 10^(0.2 Ks - 2) = 10^(-0.2 M_K) [parallax in mas], with its error from the parallax and Ks
     parallax, par_err = c("parallax"), c("parallax_error")
     ks, ks_err = c("Ks"), err("Ks")
     pseudo_mag = parallax * 10 ** (0.2 * ks - 2)
     pseudo_mag_err = np.sqrt((10 ** (0.2 * ks - 2) * par_err) ** 2 + (0.2 * np.log(10) * pseudo_mag) ** 2 * ks_err ** 2)
 
+    # inflate error in the pseudo absolute magnitude by the Casagrande+21 A_K estimate, if used, to account for uncertainty in correcting for extiction.
     ak_inflated = np.zeros(len(stars), bool)
     if cfg.ak_inflate:
         a_k = estimate_a_k(c("BP"), ks, teff, c("logg"), c("feh"), g=c("G"))["a_k"]

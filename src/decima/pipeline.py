@@ -1,7 +1,7 @@
 """The two-stage pipeline around `decima.inference`: stage 1 (noise-marginalised NPE draws), then stage 2 (distance /
 extinction importance resampling), on `StarInputs` built by `decima.io`.
 
-    summary, samples = decima.infer("stars.fits", columns={"teff": "TEFF", ...}, config=Config(n_theta=60))
+summary, samples = decima.infer("stars.fits", columns={"teff": "TEFF", ...}, config=Config(n_theta=60))
 """
 from __future__ import annotations
 
@@ -19,38 +19,35 @@ from decima.models import Models, load_models
 
 THETA_NAMES = ("feh", "alpha_fe", "log_age", "eep")
 
-
 @dataclass
 class Advanced:
     """Method settings; the defaults are the ones the method was validated with."""
-    # defensive mixture: fraction a of each latent observable's draws from q(theta | x_i), the rest from q(theta | s_i)
-    mixture_alpha: float = 0.1
+    mixture_alpha: float = 0.1 # defensive mixture: fraction a of each latent observable's draws from q(theta | x_i), the rest from q(theta | s_i)
     npe_ratio_ceiling: float = 1.0  # 1.0 = no clip; with the mixture the ratio is bounded by 1 / (1 - mixture_alpha)
-    imf_prior: bool = True          # the IMF term in stage 2 (stage 1 always uses the uniform-prior q(s))
-    grey: float = 0.0               # added to every R_b of a built-in extinction law
+    imf_prior: bool = True # apply IMF prior (Kroupa 2001)
+    grey: float = 0.0 # grey component added to every R_b of a built-in extinction law
     truncate: bool = False          # truncated importance sampling (Ionides 2008) of the stage-2 weights
     gaia_err_floor: float = 0.02    # [mag] floor on G, BP, RP errors
     twomass_err_floor: float = 0.03  # [mag] floor on J, H, Ks errors
     missing_err: float = 0.5        # [mag] error of a magnitude given without one (0: use the floor)
-    alpha_fe_fill: float = 0.0      # [alpha/Fe] where the input has none ...
-    alpha_fe_err_fill: float = 0.15  # ... with this error
+    alpha_fe_fill: float = 0.0      # [alpha/Fe] where the input has none
+    alpha_fe_err_fill: float = 0.15  # error in [alpha/Fe] when the input has none
 
 
 @dataclass
 class Config:
-    """Every setting that changes the result. Saved as config.json next to a run's output."""
+    """Inference settings. Saved as config.json next to a run's output."""
     n_latent_x: int = 800           # latent (noise-free) observables drawn per star in stage 1
     n_theta: int = 10               # theta draws per latent observable
     n_keep: int = 400               # posterior samples kept per star (of n_latent_x * n_theta)
-    percentiles: tuple = (5, 16, 50, 84, 95)
+    percentiles: tuple = (5, 16, 50, 84, 95) 
     bands: tuple = BANDS            # any subset of G, BP, RP, J, H, Ks that includes Ks
     extinction: Union[str, ExtinctionLaw] = "F19"  # a name from extinction.EXTINCTION_LAWS, or a law object
     ak_inflate: bool = True         # inflate the pseudo abs-mag error by the Casagrande+21 A_K estimate (decima.ak)
     use_logg: bool = False          # add the spectroscopic log g likelihood in stage 2
     device: str = "cpu"
-    stars_per_batch: int = 100      # stars per stage-1 flow call; 1 seeds each star on its own (draws then
-                                    # do not depend on the other stars), at ~2.5x the CPU time
-    seed: int = 22
+    stars_per_batch: int = 100      # stars per stage-1 flow call
+    seed: int = 22 # random seed
     advanced: Advanced = field(default_factory=Advanced)
 
     def __post_init__(self):

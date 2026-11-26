@@ -1,11 +1,7 @@
 """MIST isochrones on a regular grid in theta = ([Fe/H], [alpha/Fe], log(age/yr), EEP), linearly interpolated with torch.
 
 Loaded from the model release's `grid.npz` (axes, the value cube and its column names), built from MIST v1.2
-(v/v_crit = 0.4) by the research code the method was developed in (isosbi). The
-interpolation reproduces scipy's linear `RegularGridInterpolator` exactly: the same cell search (grid[i] <= x < grid[i+1],
-end cells for points on the upper edge), the same 16-corner weights summed in the same order, and NaN for points outside
-the grid or with a NaN coordinate. A NaN at any of the 16 corners makes the result NaN (0 * NaN = NaN), which marks
-off-isochrone draws as invalid downstream.
+(v/v_crit = 0.4). The interpolation reproduces scipy's linear `RegularGridInterpolator` exactly: the same cell search (grid[i] <= x < grid[i+1], end cells for points on the upper edge), the same 16-corner weights summed in the same order, and NaN for points outside the grid or with a NaN coordinate. A NaN at any of the 16 corners makes the result NaN (0 * NaN = NaN), which marks off-isochrone draws as invalid downstream.
 
 Columns: the bands G, BP, RP (Gaia EDR3) and J, H, Ks (2MASS), log_Teff, log_g and ln_dm_dEEP_prior (log IMF prior per
 unit EEP).
@@ -64,8 +60,6 @@ class IsochroneGrid:
             lower.append(i)
             frac.append((xd - grid[i]) / (grid[i + 1] - grid[i]))
 
-        # scipy's _evaluate_linear: corners in itertools.product order (lower before upper, first axis
-        # slowest), weight = 1 * w0 * w1 * w2 * w3, value = 0 + term_0 + term_1 + ... (bit-identical sums)
         value = torch.zeros(len(x), len(col_idx), dtype=torch.float64, device=x.device)
         for corner in itertools.product((0, 1), repeat=4):
             node = torch.zeros_like(lower[0])

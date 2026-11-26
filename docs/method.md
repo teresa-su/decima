@@ -1,9 +1,8 @@
 # How DECIMA works
 
 DECIMA infers θ = ([Fe/H], [α/Fe], log age, EEP) for each star, plus its distance and extinction.
-θ lives on a grid of MIST v1.2 isochrones (v/v_crit = 0.4).
-Two neural posterior estimators (NPEs) and one density estimator, all trained on simulations from that grid, do the
-heavy lifting. Importance sampling corrects their output with the photometry and parallax.
+θ lives on a grid of MIST v2.5 isochrones (v/v_crit = 0.4).
+Two neural posterior estimators (NPEs) and one density estimator, all trained on simulations from that grid provide initial posteriors over θ. Importance sampling refines the the posterior with the photometry and parallax, and provide posteriors over distance and extinction.
 
 ## Inputs, in two groups
 

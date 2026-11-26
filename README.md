@@ -1,15 +1,14 @@
 # DECIMA
 
-Stellar ages, [Fe/H], [α/Fe], evolutionary stage, distances and extinctions, for stars with a spectroscopic T_eff and
-[Fe/H], a Gaia parallax and Gaia/2MASS photometry.
+DECIMA, Roman Fate that measures the length of life via a thread, or alternativaely, Distance, Extinction, and Chronometry via Isochrone Modelling, Amortised.
 
-DECIMA uses neural posterior estimators trained on MIST isochrones, in two stages:
-1. The NPEs give fast posterior draws from the spectroscopy and a parallax-based pseudo-magnitude, marginalised over the
-   noise on those inputs.
-2. Importance sampling then folds in every photometric band, the exact parallax likelihood, a Galactic distance prior and
-   the extinction.
+This is a package that infers the stellar age, distance, extinction of a star in addition to its intrinsic [Fe/H], [α/Fe] and evolutioanry stage (parametrised by the equivalent evolutionary points). The inputs are stars with spectroscopic T_eff[Fe/H], [α/Fe] (otherwise assumed to be solar), a Gaia parallax and Gaia/2MASS photometry.
 
-It runs at about 5 s per star per CPU core, and in parallel over a big catalogue.
+DECIMA works in 2 stages:
+1. Neural posterior estimation of distance-independent parameters from spectroscopy and a parallax-based pseudo-magnitude with noise handled at inference time.
+2. Importance sampling that folds in every avaialble photometric band, the exact parallax likelihood, priors and/or log g
+
+It is very fast, runs at about 0.04s per star per GPU core.
 How it works: [docs/method.md](docs/method.md).
 
 ## Install
@@ -22,7 +21,9 @@ uv sync                 # or: pip install -e .
 Python ≥ 3.10.
 
 The trained models (≈0.25 GB) are not downloadable yet. Point `DECIMA_DATA_DIR` at a directory holding `npe.pt`,
-`npe_spec.pt`, `prior_spec.pt` and `grid.npz`. On linnunrata:
+`npe_spec.pt`, `prior_spec.pt` and `grid.npz`. 
+
+On linnunrata (internal only for now):
 
 ```bash
 export DECIMA_DATA_DIR=/export/linnunrata/tsu/decima/models
@@ -67,7 +68,7 @@ a JSON file of the same mapping with `--columns` on the shell.
 - **Missing values:** NaN or masked.
   - A missing magnitude means that band is skipped for that star.
   - A magnitude with no error gets a 0.5 mag error.
-  - A missing [α/Fe] is filled with 0 ± 0.15.
+  - A missing [α/Fe] is filled with 0 ± 0.15 by default.
 - **Rejected stars:** stars without a required value, or with `parallax_error ≤ 0`, are not run. They are listed in
   `rejected` with the reason.
 - **Spectroscopic errors** are used exactly as given. If your pipeline's errors are internal precisions, inflate them first.
@@ -83,8 +84,8 @@ to edit and pass back with `--config cfg.json`. Full details: [docs/settings.md]
 | `n_keep` | 400 | Posterior samples saved per star |
 | `bands` | G BP RP J H Ks | Bands used in stage 2. Any subset that includes Ks. |
 | `extinction` | `"F19"` | Extinction law. Colour-dependent by default. **[docs/extinction.md](docs/extinction.md)** |
-| `ak_inflate` | `True` | Widen the parallax pseudo-magnitude error for reddened stars. **[docs/ak-inflate.md](docs/ak-inflate.md)** |
-| `use_logg` | `False` | Also use the spectroscopic log g in stage 2 |
+| `ak_inflate` | `True` | Widen the parallax pseudo-magnitude error for reddened stars to aid Stage 1 sampling. **[docs/ak-inflate.md](docs/ak-inflate.md)** |
+| `use_logg` | `False` | Include the spectroscopic log g in stage 2 |
 | `device` | `"cpu"` | or `"cuda"` |
 | `stars_per_batch` | 100 | Stars per flow call (memory vs speed) |
 | `seed` | 22 | Random seed |
@@ -108,9 +109,9 @@ at those stars before using them.
 
 ## Validated domain and known limitations
 
-DECIMA can be run on any star with the required inputs. It has been checked against real data on only one kind of star.
+DECIMA can be run on any star with the required inputs.
 
-**Trained on** a uniform prior over the MIST v1.2 grid:
+**Trained on** a uniform prior over the MIST v2.5 grid:
 
 | Parameter | Range |
 |---|---|
@@ -128,22 +129,10 @@ So the training covers the main sequence, turn-off, subgiant branch, red giant b
   T_eff ≈ 5000–6650 K, log g ≈ 3.35–4.3 and [Fe/H] ≈ −1.7 to +0.3. Against the catalogue ages, the residuals have mean
   +0.2 Gyr and RMS 1.05 Gyr.
 
-**Not yet checked on real data:**
-- red giants and the red clump
-- cool K/M dwarfs and stars hotter than ≈6800 K
-- very metal-poor stars
-- highly reddened fields
-- GALAH and APOGEE stars
-
 **Known weaknesses:**
-- **Red clump / horizontal branch:** these overlap with the red giant branch in the observables, giving occasional large
-  outliers in EEP and age.
-- **Age at the grid edges:** on mocks, ages below ≈10 Gyr come out up to 0.8 Gyr high, and ages above ≈14 Gyr come out
-  2–3 Gyr low, pulled away from the 20 Gyr edge of the grid. Nested sampling shows the same bias, so it comes from the
-  prior edges, not the NPE.
-- **Binaries:** unresolved binaries are not modelled. They show up as low `ess_frac` or as ages that are too young.
-- **[Fe/H] scale:** [Fe/H] is read on the MIST solar scale (Grevesse & Sauval 1998 solar mixture). A pipeline offset
-  propagates into the age.
+- **Binaries:** unresolved binaries are not modelled.
+- For Xiang+24 LAMOST catalog, the failure rate is 0.1%.
+
 
 ## GALAH and APOGEE
 
@@ -158,14 +147,13 @@ from astropy.table import Table
 import decima
 
 t = Table.read("allStar-dr17-synspec_rev1.fits", hdu=1)
-t = t[(t["EXTRATARG"] == 0) & ((t["ASPCAPFLAG"] & 2**23) == 0)         # main sample, not STAR_BAD
+t = t[(t["EXTRATARG"] == 0) & ((t["ASPCAPFLAG"] & 2**23) == 0) # main sample, not STAR_BAD
       & (t["TEFF"] > 0) & (t["FE_H"] > -6)]
 for b in ("J", "H", "K"):
-    t[b][t[b] > 50] = np.nan                                            # 99 = not measured
-t["ALPHA_FE"] = t["ALPHA_M"] + t["M_H"] - t["FE_H"]                     # APOGEE gives [α/M], not [α/Fe]
-t["PARALLAX_ZPC"] = t["GAIAEDR3_PARALLAX"] + 0.017                      # crude global zero-point; better: Lindegren+21
-
-cfg = decima.Config(advanced=decima.Advanced(missing_err=0))            # no Gaia mag errors: use the 0.02 mag floor
+    t[b][t[b] > 50] = np.nan # 99 = not measured
+t["ALPHA_FE"] = t["ALPHA_M"] + t["M_H"] - t["FE_H"] # APOGEE gives [α/M], not [α/Fe]
+t["PARALLAX_ZPC"] = t["GAIAEDR3_PARALLAX"] + 0.017 # crude global zero-point; better: Lindegren+21
+cfg = decima.Config(advanced=decima.Advanced(missing_err=0)) # no Gaia mag errors: use the 0.02 mag floor
 summary, samples, rejected = decima.infer(t, columns=json.load(open("examples/columns/apogee_dr17.json")), config=cfg)
 ```
 
@@ -189,22 +177,13 @@ summary, samples, rejected = decima.infer(t, columns=json.load(open("examples/co
   quadrature.
 - **Giants:** most of these stars are giants, which is outside the real-data validation above.
 
-## Testing
-
-<!-- TODO(Teresa): in your own words. What you'd like them to try, and what to send back. -->
-
-When something looks wrong, send:
-- the command or `decima.infer` call;
-- `config.json` (or `cfg.to_json()`);
-- the input rows and summary rows of the stars in question;
-- `progress.log`, for `decima run`.
 
 ## Development
 
 ```bash
 uv sync
-uv run pytest                                            # fast tests (the model-dependent ones are skipped)
-DECIMA_DATA_DIR=/path/to/models uv run pytest            # plus the regression against the reference outputs (~1 min)
+uv run pytest # fast tests (the model-dependent ones are skipped)
+DECIMA_DATA_DIR=/path/to/models uv run pytest # plus the regression against the reference outputs (~1 min)
 ```
 
 ## Licence

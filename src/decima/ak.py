@@ -15,14 +15,13 @@ import numpy as np
 #   Teff = a0 + a1 X + a2 X^2 + a3 X^3 + a4 X^5
 #          + log g (a5 + a6 X + a7 X^2 + a8 X^3 + a9 X^5)
 #          + [Fe/H] (a10 + a11 X + a12 X^2 + a13 X^3 + a14 log g X)
-# where X = (BP - Ks)_0. a4 and a9 are not used for this colour.
 _A = (8266.0, -2124.5574, 355.5051, -23.1719, 0.0,
       209.9927, -161.4505, 50.5904, -6.3337, 0.0,
       -27.2653, -160.3595, 67.9016, -6.5232, 16.5137)
 
-COLOUR_RANGE = (0.30, 4.20)   # recommended range of (BP-Ks)_0 for dwarfs (Casagrande+21 Table 2); giants go to 5.30
-A_K_PER_E_BPKS = 0.124        # A_K / E(BP-Ks) = R_Ks / (R_BP - R_Ks), taken as a constant (it varies by ~0.01 over BP-RP_0 = 0.5-1.5)
-LOGG_FILL = 4.0               # log g where it is missing: the dwarf value of Casagrande+21 Sec. 4 (the catalog is MSTO / subgiants)
+COLOUR_RANGE = (0.30, 4.20) # recommended range of (BP-Ks)_0 for dwarfs (Casagrande+21 Table 2); giants go to 5.30
+A_K_PER_E_BPKS = 0.124 # A_K / E(BP-Ks) = R_Ks / (R_BP - R_Ks), taken as a constant (it varies by ~0.01 over BP-RP_0 = 0.5-1.5)
+LOGG_FILL = 4.0  # log g where it is missing: the dwarf value of Casagrande+21 Sec. 4
 
 
 def teff_from_colour(x, logg, feh):
@@ -37,8 +36,7 @@ def teff_from_colour(x, logg, feh):
 def intrinsic_colour(teff, logg, feh, n_iter=50, tol=1.0):
     """(BP-Ks)_0 at which `teff_from_colour` returns `teff`, by bisection on COLOUR_RANGE (Teff falls with colour there).
 
-    NaN where an input is not finite or no colour in the range gives `teff` to within `tol` K (a star hotter than the
-    relation at the blue end or cooler than it at the red end, or Teff outside the calibrated 4000-8000 K)."""
+    NaN where an input is not finite or no colour in the range gives `teff` to within `tol` K (a star hotter than the relation at the blue end or cooler than it at the red end, or Teff outside the calibrated 4000-8000 K)."""
     teff, logg, feh = np.broadcast_arrays(np.asarray(teff, float), np.asarray(logg, float), np.asarray(feh, float))
     lo, hi = np.full(teff.shape, COLOUR_RANGE[0]), np.full(teff.shape, COLOUR_RANGE[1])
     with np.errstate(invalid="ignore"):
@@ -55,8 +53,7 @@ def estimate_a_k(bp, ks, teff, logg, feh, g=None, logg_fill=LOGG_FILL):
     """A_K [mag] and E(BP-Ks) per star from Gaia EDR3 BP, 2MASS Ks and the spectroscopic Teff [K], log g, [Fe/H].
 
     A_K is clipped at 0 (the colour excess is noisy, ~0.045 mag, so about 16% of the catalog comes out below zero).
-    NaN where BP or Ks is missing, the star is outside the calibration (BP <= 5, or G <= 6 when `g` is given: Gaia
-    saturation), or `intrinsic_colour` finds no solution. A missing log g takes `logg_fill`.
+    NaN where BP or Ks is missing, the star is outside the calibration (BP <= 5, or G <= 6 when `g` is given: Gaia saturation), or `intrinsic_colour` finds no solution. A missing log g takes `logg_fill`.
     Returns a dict with a_k, e_bpks (unclipped) and x0 (intrinsic colour), each (n,).
     """
     bp, ks, teff, feh = (np.asarray(v, float) for v in (bp, ks, teff, feh))
@@ -69,11 +66,7 @@ def estimate_a_k(bp, ks, teff, logg, feh, g=None, logg_fill=LOGG_FILL):
 
 
 def inflate_pseudo_mag_err(pseudo_mag, pseudo_mag_err, a_k):
-    """Add the unmodelled extinction to the error of the pseudo absolute magnitude, in quadrature.
-
-    The parallax-based pseudo magnitude is parallax * 10^(0.2 Ks - 2) = 10^(0.2 (M_K + A_K)), so it is too large by the
-    factor 10^(0.2 A_K): a fraction 0.2 ln(10) A_K ~ 0.46 A_K that the NPE ignores. That fraction times the pseudo
-    magnitude is added to the error; the value is not corrected. Where `a_k` is NaN (no estimate) the error is unchanged.
+    """Add the unmodelled extinction to the error of the pseudo absolute magnitude, in quadrature. This is only to add error to pseudo absolute magnitude for stage-1 inference.
     """
     extra = 0.2 * np.log(10) * pseudo_mag * np.where(np.isfinite(a_k), a_k, 0.0)
     return np.sqrt(pseudo_mag_err ** 2 + extra ** 2)

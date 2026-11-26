@@ -9,8 +9,8 @@ Layout of `out`:
     summary.<format>                     one row per star (percentiles, diagnostics, flags), in input order
     samples.h5                           "samples" (n_stars, n_keep, n_q) posterior draws, "id", "quantity_names"
 
-Chunk c (stars c*chunk ...) is seeded config.seed + c*chunk, so results do not depend on the number of workers, and
-re-running the same call resumes: finished chunks are skipped. A different config or chunk size needs a new `out`.
+Chunk c (stars c*chunk ...) is seeded config.seed + c*chunk, so results do not depend on the number of workers, and re-running the same call resumes: finished chunks are skipped. A different config or chunk size needs a new `out`.
+
 Each worker uses one CPU thread; with config.device="cuda" every worker shares the GPU.
 """
 import json
@@ -106,8 +106,7 @@ def _merge(out, cfg, chunk, summary_format):
 
 def run(source, out, columns: dict = None, config: Config = None, workers: int = 1, chunk: int = 250,
         summary_format: str = "fits"):
-    """Run DECIMA on `source` (path, astropy Table or pandas DataFrame) into the directory `out`; see the module
-    docstring. `summary_format` is the file extension astropy writes the summary table with (fits, ecsv, csv, ...).
+    """Run DECIMA on `source` (path, astropy Table or pandas DataFrame) into the directory `out`; see the module docstring. `summary_format` is the file extension astropy writes the summary table with (fits, ecsv, csv, ...).
     Returns the path of the summary table."""
     out, cfg = Path(out), config or Config()
     _prepare(source, out, columns, cfg, chunk)

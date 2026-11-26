@@ -16,7 +16,6 @@ BJ21_PRIOR_TABLE = Path(__file__).parent / "data" / "bj21_ggd.csv"
 # Fallback for stars without a sky position: the s^2 exp(-s/1000) EDSD prior (GGD with alpha=1, beta=2)
 BJ_DEFAULT_PARAMS = (1000.0, 1.0, 2.0)
 
-
 class GeneralizedGamma(TransformedDistribution):
     """
     Bailer-Jones+21 generalised gamma distribution (GGD) over distance r (pc):

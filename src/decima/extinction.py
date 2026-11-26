@@ -2,10 +2,10 @@
 
 Pick a built-in law by name, or build one:
 
-    get_law("F19")                                   # default: Fitzpatrick+19 EDR3, colour-dependent, E' = A0
-    FixedLaw({"G": 2.29, "BP": 3.05, "RP": 1.74, "J": 0.63, "H": 0.32, "Ks": 0.16})   # constant R_b, E' = E(B-V)
-    PolynomialLaw(coeffs, x="BP-RP", x_range=(-0.06, 2.5))                         # Fitzpatrick+19-form polynomial
-    class MyLaw(ExtinctionLaw): ...                                                 # anything else
+    get_law("F19")  # default: Fitzpatrick+19 EDR3, colour-dependent, E' = A0
+    FixedLaw({"G": 2.29, "BP": 3.05, "RP": 1.74, "J": 0.63, "H": 0.32, "Ks": 0.16})  # constant R_b, E' = E(B-V)
+    PolynomialLaw(coeffs, x="BP-RP", x_range=(-0.06, 2.5)) # Fitzpatrick+19-form polynomial
+    class MyLaw(ExtinctionLaw): ...   # anything else
 
 Built-in laws:
     SS2018, WC2019  fixed R_b per band (Schlafly & Finkbeiner 2018; Wang & Chen 2019); E' is E(B-V).
