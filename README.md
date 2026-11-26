@@ -1,17 +1,12 @@
 # DECIMA
 
-Decima is the Roman Fate who measures the thread of life. DECIMA is also Distance, Extinction and Chronometry via
-Isochrone Modelling, Amortised.
+Decima is the Roman Fate who measures the thread of life. DECIMA is also Distance, Extinction and Chronometry via Isochrone Modelling via Amortised Inference.
 
-DECIMA infers a star's age, distance and extinction, together with its initial [Fe/H], [α/Fe] and evolutionary stage
-(parametrised by the equivalent evolutionary point, EEP). It needs spectroscopic T_eff and [Fe/H] (and [α/Fe], which is
-otherwise assumed solar), a Gaia parallax, and Gaia and 2MASS photometry.
+This package infers a star's age, distance and extinction, together with its initial [Fe/H], [α/Fe] and evolutionary stage (parametrised by the equivalent evolutionary point, EEP). It needs spectroscopic T_eff and [Fe/H] (and [α/Fe], which is otherwise assumed solar), a Gaia parallax, and Gaia and 2MASS photometry.
 
 DECIMA works in two stages:
-1. Neural posterior estimation of the distance-independent parameters from the spectroscopy and a parallax-based
-   pseudo-magnitude. Measurement noise is handled at inference time.
-2. Importance sampling that folds in every available photometric band, the exact parallax likelihood, the priors and,
-   optionally, the spectroscopic log g.
+1. Neural posterior estimation of the distance-independent parameters from the spectroscopy and a parallax-based pseudo-magnitude. Measurement noise is handled at inference time.
+2. Importance sampling that folds in every available photometric band, the exact parallax likelihood, the priors and, optionally, the spectroscopic log g.
 
 It is fast: about 0.04 s per star per GPU core.
 How it works: [docs/method.md](docs/method.md).
@@ -59,9 +54,7 @@ A worked example on five stars: [examples/quickstart.ipynb](examples/quickstart.
 
 ## Input
 
-Any table astropy reads (FITS, CSV, ECSV, VOTable, HDF5, Parquet), or an astropy `Table` / pandas `DataFrame`.
-DECIMA looks for the canonical column names below. Map your own names with `columns={"teff": "TEFF", ...}` in Python, or
-a JSON file of the same mapping with `--columns` on the shell.
+Any table astropy reads (FITS, CSV, ECSV, VOTable, HDF5, Parquet), or an astropy `Table` / pandas `DataFrame`. DECIMA looks for the canonical column names below. Map your own names with `columns={"teff": "TEFF", ...}` in Python, or a JSON file of the same mapping with `--columns` on the shell.
 
 | | Columns |
 |---|---|
@@ -81,8 +74,7 @@ a JSON file of the same mapping with `--columns` on the shell.
 
 ## Settings
 
-All settings that change results are in `decima.Config`. On the shell, `decima default-config > cfg.json` writes them out
-to edit and pass back with `--config cfg.json`. Full details: [docs/settings.md](docs/settings.md).
+All settings that change results are in `decima.Config`. On the shell, `decima default-config > cfg.json` writes them out to edit and pass back with `--config cfg.json`. Full details: [docs/settings.md](docs/settings.md).
 
 | Setting | Default | |
 |---|---|---|
@@ -97,8 +89,7 @@ to edit and pass back with `--config cfg.json`. Full details: [docs/settings.md]
 | `device` | `"cpu"` | or `"cuda"` |
 | `stars_per_batch` | 100 | Stars per flow call (memory vs speed) |
 
-Plus the method settings (`mixture_alpha`, `npe_ratio_ceiling`, `imf_prior`, `grey`, `parallax_snr_min`) and the input
-error floors and fills: all in [docs/settings.md](docs/settings.md).
+Plus the method settings (`mixture_alpha`, `npe_ratio_ceiling`, `imf_prior`, `grey`, `parallax_snr_min`) and the input error floors and fills: all in [docs/settings.md](docs/settings.md).
 
 ## Output
 
@@ -112,9 +103,7 @@ error floors and fills: all in [docs/settings.md](docs/settings.md).
 
 `decima run` writes `summary.fits`, `samples.h5` and `rejected.ecsv` into the run directory.
 
-**Failed stars** have `failed = True`: either no stage-1 draw was usable (percentiles NaN), or the age posterior has no
-width on one side of the median (its 16th or 84th percentile equals the median). Don't use their results. What every
-column means, and other warning signs: [docs/outputs.md](docs/outputs.md).
+**Failed stars** have `failed = True`: either no stage-1 draw was usable (percentiles NaN), or the age posterior has no width on one side of the median (its 16th or 84th percentile equals the median). Don't use their results. What every column means, and other warning signs: [docs/outputs.md](docs/outputs.md).
 
 ## Validated domain and known limitations
 
@@ -132,11 +121,8 @@ DECIMA can be run on any star with the required inputs.
 So the training covers the main sequence, turn-off, subgiant branch, red giant branch, red clump and horizontal branch.
 
 **Validated on:**
-- **Mock stars** from that prior (no extinction), against nested sampling. Posterior coverage is close to nominal:
-  5.6–7.7% of true values fall outside the 95% interval, against 5% nominal.
-- **Real stars:** the Xiang+24 LAMOST catalogue of turn-off and subgiant stars (≈250,000 single stars). These have
-  T_eff ≈ 5000–6650 K, log g ≈ 3.35–4.3 and [Fe/H] ≈ −1.7 to +0.3. Against the catalogue ages, the residuals have mean
-  +0.2 Gyr and RMS 1.05 Gyr.
+- **Mock stars** from that prior (no extinction), against nested sampling. Posterior coverage is close to nominal: 5.6–7.7% of true values fall outside the 95% interval, against 5% nominal.
+- **Real stars:** the Xiang+24 LAMOST catalogue of turn-off and subgiant stars (≈250,000 single stars). These have T_eff ≈ 5000–6650 K, log g ≈ 3.35–4.3 and [Fe/H] ≈ −1.7 to +0.3. Against the catalogue ages, the residuals have mean +0.2 Gyr and RMS 1.05 Gyr.
 
 **Known weaknesses:**
 - **Binaries:** unresolved binaries are not modelled.
