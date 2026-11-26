@@ -8,7 +8,7 @@ Files (model release v1):
 
 Each .pt is a plain dict {"arch": builder kwargs, "state_dict": weights, "prior_loc"/"prior_scale" (posteriors)}, so
 it loads with `torch.load(weights_only=True)` and does not depend on pickled classes. The files are looked up in
-$DECIMA_DATA_DIR if set, else downloaded once into pooch's cache.
+$DECIMA_DATA_DIR if set, else (once the release is online; see REGISTRY) downloaded once into pooch's cache.
 """
 import os
 from dataclasses import dataclass
@@ -85,8 +85,8 @@ class Models:
 
 
 def load_models(device: str = "cpu") -> Models:
-    """Load (downloading if needed) the flows and the grid. With device="cuda" both stages run on the GPU; draws then
-    differ from a CPU run (other RNG stream)."""
+    """Load the flows and the grid (from $DECIMA_DATA_DIR; see `fetch`). With device="cuda" both stages run on the GPU;
+    draws then differ from a CPU run (other RNG stream)."""
     load = lambda name: torch.load(fetch(name), weights_only=True)
     npe, npe_spec = build_posterior(load("npe.pt")), build_posterior(load("npe_spec.pt"))
     prior_spec = build_marginal(load("prior_spec.pt"))

@@ -1,6 +1,7 @@
 """MIST isochrones on a regular grid in theta = ([Fe/H], [alpha/Fe], log(age/yr), EEP), linearly interpolated with torch.
 
-Loaded from the `.npz` written by isosbi's `export_decima_models.py` (axes, the value cube and its column names). The
+Loaded from the model release's `grid.npz` (axes, the value cube and its column names), built from MIST v1.2
+(v/v_crit = 0.4) by the research code the method was developed in (isosbi). The
 interpolation reproduces scipy's linear `RegularGridInterpolator` exactly: the same cell search (grid[i] <= x < grid[i+1],
 end cells for points on the upper edge), the same 16-corner weights summed in the same order, and NaN for points outside
 the grid or with a NaN coordinate. A NaN at any of the 16 corners makes the result NaN (0 * NaN = NaN), which marks

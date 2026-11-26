@@ -1,0 +1,11 @@
+{
+  "id": "APOGEE_ID",
+  "ra": "RA", "dec": "DEC",
+  "parallax": "PARALLAX_ZPC", "parallax_error": "GAIAEDR3_PARALLAX_ERROR",
+  "teff": "TEFF", "teff_error": "TEFF_ERR",
+  "logg": "LOGG", "logg_error": "LOGG_ERR",
+  "feh": "FE_H", "feh_error": "FE_H_ERR",
+  "alpha_fe": "ALPHA_FE", "alpha_fe_error": "ALPHA_M_ERR",
+  "G": "GAIAEDR3_PHOT_G_MEAN_MAG", "BP": "GAIAEDR3_PHOT_BP_MEAN_MAG", "RP": "GAIAEDR3_PHOT_RP_MEAN_MAG",
+  "J": "J", "J_error": "J_ERR", "H": "H", "H_error": "H_ERR", "Ks": "K", "Ks_error": "K_ERR"
+}

@@ -1,0 +1,12 @@
+{
+  "id": "sobject_id",
+  "ra": "ra", "dec": "dec",
+  "parallax": "parallax", "parallax_error": "parallax_error",
+  "teff": "teff", "teff_error": "e_teff",
+  "logg": "logg", "logg_error": "e_logg",
+  "feh": "fe_h", "feh_error": "e_fe_h",
+  "G": "phot_g_mean_mag", "G_error": "phot_g_mean_mag_error",
+  "BP": "phot_bp_mean_mag", "BP_error": "phot_bp_mean_mag_error",
+  "RP": "phot_rp_mean_mag", "RP_error": "phot_rp_mean_mag_error",
+  "J": "j_m", "J_error": "j_msigcom", "H": "h_m", "H_error": "h_msigcom", "Ks": "ks_m", "Ks_error": "ks_msigcom"
+}
