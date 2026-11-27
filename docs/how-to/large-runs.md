@@ -10,8 +10,8 @@ decima run catalogue.fits --out run/ --columns cols.json --config settings.json 
 ```
 
 The same from Python:
-
-```{.python notest}
+<!-- notest -->
+```python
 import decima
 
 if __name__ == "__main__":      # needed in a script: workers are started as fresh processes
@@ -20,7 +20,7 @@ if __name__ == "__main__":      # needed in a script: workers are started as fre
 
 `--columns` is the [columns file](config-files.ipynb) (your names → DECIMA's) and `--config` the settings file; both are optional.
 
-| Option | Default | |
+| Option | Default | Description |
 |---|---|---|
 | `--workers` | 1 | Worker processes. Each uses one CPU thread and loads its own copy of the models (about 0.25 GB). |
 | `--chunk` | 250 | Stars per checkpoint. Also sets the random draws (below). |
@@ -63,4 +63,3 @@ decima default-config | sed 's/"cpu"/"cuda"/' > settings.json
 - All workers share the GPU, so a few workers are enough to keep it busy.
 - Raise `stars_per_batch` (default 100) on a GPU; lower it if memory runs out.
 - CUDA and CPU draw different random numbers, so their results differ within the posterior's noise.
-

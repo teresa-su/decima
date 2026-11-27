@@ -6,7 +6,8 @@ DECIMA returns a posterior for every star it can run, including stars where some
 
 `failed = True` means the star's result is not usable: either no stage-1 draw was usable (its percentiles are NaN), or its age posterior has no width on one side of the median, because a few draws carry all the weight. `uniform_fallback = True` means every weight vanished and the "posterior" is just the proposal: treat it as failed too.
 
-```{.python notest}
+<!-- notest -->
+```python
 good = ~summary["failed"] & ~summary["uniform_fallback"]
 ```
 
