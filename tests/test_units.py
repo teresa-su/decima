@@ -1,5 +1,6 @@
 """Fast checks that need no models."""
 from math import lgamma, log
+from pathlib import Path
 
 import healpy as hp
 import numpy as np
@@ -141,3 +142,126 @@ def test_parallax_zero_point():
     t["G"], t["nu_eff_used_in_astrometry"], t["pseudocolour"], t["ecl_lat"], t["astrometric_params_solved"] = [15.0], [1.5], [np.nan], [10.0], [31]
     inputs, _ = build_inputs(t, Config(parallax_zero_point=True))
     assert inputs.zero_point_applied[0] and np.isclose(inputs.par_obs[0].item(), 2.0 - want[0], rtol=1e-6)
+
+
+# --- settings errors say how to fix them -----------------------------------------------------------------------------
+
+def test_config_errors_say_how_to_fix():
+    with pytest.raises(ValueError, match="0.1, 0.2"):
+        Config(mixture_alpha=0.05, n_theta=10)
+    with pytest.raises(ValueError, match="did you mean 'F19'"):
+        Config(extinction="F99")
+    with pytest.raises(ValueError, match="use 'cuda'"):
+        Config(device="gpu")
+    Config(device="cuda:1")
+    with pytest.raises(ValueError, match="did you mean 'n_theta'"):
+        Config.from_json('{"n_thetas": 5}')
+    assert Config.from_json('{"n_keep": 7}').n_keep == 7  # missing settings keep their defaults
+
+
+# --- column metadata, suggest_columns, check_inputs ------------------------------------------------------------------
+
+def test_column_info_is_consistent():
+    from decima.io import COLUMN_INFO, COLUMNS, REQUIRED
+    assert tuple(COLUMN_INFO) == COLUMNS
+    assert {c for c, i in COLUMN_INFO.items() if i.group == "required"} == set(REQUIRED) | {"Ks_error"}
+    assert all(i.description for i in COLUMN_INFO.values())
+
+
+def test_suggest_columns_reproduces_the_reference_mapping():
+    from test_regression import XIANG_COLUMNS
+    sug = decima.suggest_columns(Table.read(Path(__file__).parent / "data" / "reference_stars.ecsv"))
+    assert dict(sug) == XIANG_COLUMNS and not sug.ambiguous and not sug.missing and not sug.unused
+
+
+@pytest.mark.parametrize("names,expect", [
+    ({"parallax": "Plx", "parallax_error": "e_Plx", "teff": "Teff", "teff_error": "e_Teff"},
+     {"parallax": "Plx", "parallax_error": "e_Plx", "teff": "Teff", "teff_error": "e_Teff"}),
+    ({"Ks": "Kmag", "Ks_error": "e_Kmag", "feh": "fe_h", "feh_error": "e_fe_h"},
+     {"Ks": "Kmag", "Ks_error": "e_Kmag", "feh": "fe_h", "feh_error": "e_fe_h"}),
+    ({"Ks": "ks_m", "Ks_error": "ks_msigcom", "J": "j_m", "J_error": "j_msigcom"},
+     {"Ks": "ks_m", "Ks_error": "ks_msigcom", "J": "j_m", "J_error": "j_msigcom"}),
+])
+def test_suggest_columns_patterns(names, expect):
+    t = Table({v: [1.0] for v in names.values()})
+    assert dict(decima.suggest_columns(t)) == expect
+
+
+def test_suggest_columns_does_not_guess_between_candidates():
+    t = Table({"TEFF": [5800.0], "teff_spec": [5700.0], "FEH": [0.0]})
+    sug = decima.suggest_columns(t)
+    assert "teff" not in sug and sorted(sug.ambiguous["teff"]) == ["TEFF", "teff_spec"]
+    assert sug["feh"] == "FEH"
+
+
+def test_suggest_columns_already_canonical_and_missing():
+    sug = decima.suggest_columns(ROWS)
+    assert dict(sug) == {} and "teff" in sug.exact
+    sug = decima.suggest_columns(Table({"TEFF": [1.0]}))
+    assert "feh" in sug.missing and "ra" in sug.missing
+
+
+def _broken():
+    t = ROWS.copy()
+    t["ra"], t["dec"] = [10.0, 200.0, 300.0], [-20.0, 40.0, 10.0]
+    t["feh"][2] = 0.1
+    t["parallax_error"] = 0.02
+    return t
+
+
+def test_check_inputs_ok_and_counts_rejections():
+    rep = decima.check_inputs(_broken())
+    assert rep.ok and rep.n_run == 3 and rep.rejected == {}
+    t = _broken()
+    t["feh"][1] = np.nan
+    rep = decima.check_inputs(t)
+    assert rep.ok and rep.n_run == 2 and rep.rejected == {"no feh": 1}
+    assert "2 of 3 stars can be run" in str(rep)
+
+
+def test_check_inputs_names_each_problem():
+    t = _broken()
+    t["teff"] = np.log10(t["teff"])                      # log Teff
+    t["parallax"] = t["parallax"] / 1000                 # arcsec
+    t["Ks"][0] = 99.0                                    # flag
+    t["ra"], t["dec"] = np.radians(t["ra"]), np.radians(t["dec"])  # radians
+    t.rename_column("feh", "FEH_x")
+    rep = decima.check_inputs(t)                          # no columns file: feh is missing
+    assert not rep.ok
+    assert any("FEH_x" in e for e in rep.errors)
+    t.rename_column("FEH_x", "feh")
+    rep = decima.check_inputs(t)
+    text = " | ".join(rep.warnings)
+    assert rep.ok
+    for word in ("Kelvin", "arcseconds", "99", "radians"):
+        assert word in text
+
+
+def test_check_inputs_columns_file_errors():
+    t = _broken()
+    rep = decima.check_inputs(t, {"tef": "teff"})
+    assert any("did you mean 'teff'" in e for e in rep.errors)
+    rep = decima.check_inputs(t, {"teff": "TEF"})
+    assert any("teff" in e and "'TEF'" in e and "did you mean 'teff'" in e for e in rep.errors)
+
+
+def test_check_inputs_settings_and_unreadable_table(tmp_path):
+    (tmp_path / "bad.json").write_text('{"n_thetas": 5}')
+    rep = decima.check_inputs(_broken(), config=tmp_path / "bad.json")
+    assert not rep.ok and any("n_theta" in e for e in rep.errors)
+    assert not decima.check_inputs(tmp_path / "nope.fits").ok
+
+
+def test_read_table_names_the_canonical_key():
+    with pytest.raises(ValueError, match=r"teff -> 'TEF'.*did you mean 'teff'"):
+        read_table(ROWS, {"teff": "TEF"})
+    with pytest.raises(ValueError, match="did you mean 'teff'"):
+        read_table(ROWS, {"tef": "teff"})
+
+
+def test_fetch_uses_a_copy_in_decima_data_dir_as_is(tmp_path, monkeypatch):
+    from decima.models import fetch
+    monkeypatch.setenv("DECIMA_DATA_DIR", str(tmp_path))
+    (tmp_path / "npe.pt").write_bytes(b"not the released file")
+    assert fetch("npe.pt") == tmp_path / "npe.pt"  # no download, and the copy is not overwritten
+    assert (tmp_path / "npe.pt").read_bytes() == b"not the released file"

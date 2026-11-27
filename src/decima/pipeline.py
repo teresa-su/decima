@@ -5,7 +5,9 @@ summary, samples, rejected = decima.infer("stars.fits", columns={"teff": "TEFF",
 """
 from __future__ import annotations
 
+import difflib
 import json
+import re
 from dataclasses import dataclass, fields
 from typing import Optional, Union
 
@@ -13,7 +15,7 @@ import numpy as np
 import torch
 from astropy.table import Table
 
-from decima.extinction import BANDS, ExtinctionLaw, from_dict, get_law
+from decima.extinction import BANDS, EXTINCTION_LAWS, ExtinctionLaw, from_dict, get_law
 from decima.inference import inference_stage1_chunks, inference_stage2_chunks
 from decima.models import MODEL_VERSION, Models, load_models
 
@@ -56,9 +58,16 @@ class Config:
             raise ValueError(f"bands must be a subset of {BANDS} that includes Ks, got {self.bands}")
         m_x = self.mixture_alpha * self.n_theta
         if not 0 <= self.mixture_alpha <= 1 or abs(m_x - round(m_x)) > 1e-9:
-            raise ValueError(f"mixture_alpha * n_theta must be a whole number in [0, n_theta], got {self.mixture_alpha} * {self.n_theta}")
+            allowed = ", ".join(f"{k / self.n_theta:g}" for k in range(self.n_theta + 1)) if self.n_theta <= 20 else "k / n_theta for whole k"
+            raise ValueError(f"mixture_alpha * n_theta must be a whole number in [0, n_theta], got {self.mixture_alpha} * {self.n_theta} = {m_x:g}. "
+                             f"With n_theta={self.n_theta}, mixture_alpha can be {allowed}; or change n_theta.")
         if isinstance(self.extinction, dict):
             self.extinction = from_dict(self.extinction)
+        if isinstance(self.extinction, str) and self.extinction not in EXTINCTION_LAWS:
+            raise ValueError(f"unknown extinction law {self.extinction!r}{_did_you_mean(self.extinction, EXTINCTION_LAWS)}; choose from {EXTINCTION_LAWS}")
+        if not isinstance(self.device, str) or not re.fullmatch(r"cpu|cuda(:\d+)?", self.device):
+            hint = " (for a GPU use 'cuda')" if str(self.device).lower() in ("gpu", "cuda0", "gpu0") else ""
+            raise ValueError(f"device must be 'cpu', 'cuda' or 'cuda:N', got {self.device!r}{hint}")
 
     def law(self) -> ExtinctionLaw:
         if isinstance(self.extinction, ExtinctionLaw):
@@ -73,7 +82,18 @@ class Config:
 
     @classmethod
     def from_json(cls, text: str) -> "Config":
-        return cls(**json.loads(text))
+        """Settings from the text of a settings file (`decima default-config > settings.json`). Missing settings keep their defaults."""
+        d = json.loads(text)
+        valid = [f.name for f in fields(cls)]
+        for k in d:
+            if k not in valid:
+                raise ValueError(f"unknown setting {k!r} in the settings file{_did_you_mean(k, valid)}. Valid settings: {', '.join(valid)}")
+        return cls(**d)
+
+
+def _did_you_mean(name, options) -> str:
+    close = difflib.get_close_matches(str(name), [str(o) for o in options], n=1)
+    return f" (did you mean {close[0]!r}?)" if close else ""
 
 
 @dataclass
@@ -224,6 +244,25 @@ def run_chunk(inputs: StarInputs, models: Models, cfg: Config, seed: int) -> dic
     }
 
 
+# the diagnostic and flag columns of the summary table (after the percentiles), with what they mean; docs/reference/outputs.md is generated from this
+DIAGNOSTICS = {
+    "failed": "The star failed: no usable stage-1 draw, or an age posterior with no width on one side of the median. Do not use its results.",
+    "uniform_fallback": "Every importance weight vanished, so the 'posterior' is just the stage-1 proposal. Treat as failed.",
+    "ess_frac": "Effective sample size of the stage-2 importance weights as a fraction of the stage-1 draws. The main quality number.",
+    "ess_norm_stage1": "Effective sample size of the stage-1 q(s) weights as a fraction of the draws. Low when the spectroscopy sits at the edge of the training prior.",
+    "frac_valid_samples_pre": "Fraction of stage-1 draws usable in stage 2: on the grid, with enough bands, and a finite weight.",
+    "frac_colour_clipped": "Fraction of draws whose intrinsic colour was outside the extinction law's calibration (colour-dependent laws only).",
+    "n_negative_extinction": "Number of draws whose sampled extinction was negative or NaN, and which were dropped.",
+    "par_valid": "The parallax was precise enough (`parallax_snr_min`) to enter the stage-2 distance-extinction fit directly. The exact parallax likelihood is used either way.",
+    "pseudo_mag_inflated": "The pseudo absolute magnitude error was widened by an A_K estimate (`pseudo_mag_inflate`).",
+    "zero_point_applied": "The Lindegren+21 parallax zero-point was subtracted from this star's parallax (`parallax_zero_point`).",
+}
+BAND_DIAGNOSTICS = {
+    "{band}_used": "The band had a magnitude and an error for this star, so it entered stage 2.",
+    "{band}_err_missing": "The band had a magnitude but no error, so `missing_err` was used.",
+}
+
+
 def summary_table(res: dict, cfg: Config) -> Table:
     """One row per star: id, percentiles of every quantity, diagnostics and flags. The table's meta records the DECIMA
     version, the model release and the config (written to the FITS header / ECSV meta)."""
@@ -232,8 +271,7 @@ def summary_table(res: dict, cfg: Config) -> Table:
     for j, q in enumerate(quantity_names(cfg)):
         for i, p in enumerate(cfg.percentiles):
             t[f"{q}_p{p:g}"] = res["percentiles"][:, i, j]
-    for k in ("failed", "uniform_fallback", "ess_frac", "ess_norm_stage1", "frac_valid_samples_pre",
-              "frac_colour_clipped", "n_negative_extinction", "par_valid", "pseudo_mag_inflated", "zero_point_applied"):
+    for k in DIAGNOSTICS:
         t[k] = res[k]
     for i, b in enumerate(cfg.bands):
         t[f"{b}_used"] = res["band_used"][:, i]

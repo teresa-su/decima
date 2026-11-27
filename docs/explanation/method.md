@@ -7,6 +7,37 @@ Importance sampling then refines it with the photometry and parallax, and adds t
 
 The details, derivations and validation are in the DECIMA paper (in preparation). This page is the short version.
 
+## The pipeline at a glance
+
+```mermaid
+flowchart TD
+    IN["Per star: spectroscopy s = ([Fe/H], [α/Fe], log T<sub>eff</sub>)<br/>Ks and parallax → pseudo-magnitude M<sub>pseudo,K</sub><br/>magnitudes m<sub>b</sub>, parallax ϖ, optional log g"]
+
+    subgraph S1["Stage 1: distance-independent, neural posterior estimation"]
+        direction TB
+        A["1. Draw n_latent_x noise-free spectroscopic observables s′<br/>around the measured s, weighted by q(s′)"]
+        B["2. For each s′ draw n_theta values of θ from a defensive mixture<br/>mixture_alpha: q(θ | s′, M<sub>pseudo,K</sub>) · rest: q(θ | s′)"]
+        C["3. Stage-1 weight: q(s′) · q(θ | s′) / mixture proposal<br/>(the parallax is counted once, in stage 2)"]
+        A --> B --> C
+    end
+
+    subgraph S2["Stage 2: importance sampling with the photometry and parallax"]
+        direction TB
+        D["4. Isochrone lookup: absolute magnitudes M<sub>b</sub>(θ) of every draw"]
+        E["5. Fit distance modulus μ and extinction E to m<sub>b</sub> − M<sub>b</sub><br/>(weighted least squares; the parallax joins when precise)"]
+        F["6. Draw (μ, E) around the fit with E ≥ 0; convert μ to distance d"]
+        G["7. Stage-2 weight: photometric and parallax likelihoods,<br/>IMF and distance priors, (log g) / proposal density"]
+        D --> E --> F --> G
+    end
+
+    OUT["8. Multiply the weights and resample (θ, d, E):<br/>unweighted posterior samples, percentiles and diagnostics"]
+    IN --> A
+    C --> D
+    G --> OUT
+```
+
+Settings that act on each step are named in the [settings reference](../reference/settings.md).
+
 ## Inputs
 
 | Symbol | What |
@@ -47,6 +78,7 @@ For every stage-1 draw, the isochrone gives the absolute magnitudes:
 The weights also swap the proposal for q(θ | s), so the parallax is counted once.
 
 ## Priors
+The trained models are deliberately kept free of physical priors: they see θ drawn uniformly over the grid. Priors are applied afterwards, as importance weights in stage 2. DECIMA currently has the ability to apply the IMF prior on θ and a distance prior; support for user-defined priors is planned.
 
 | On | Prior |
 |---|---|
@@ -56,7 +88,7 @@ The weights also swap the proposal for q(θ | s), so the parallax is counted onc
 
 ## Further reading
 
-- [settings.md](settings.md): every setting.
-- [extinction.md](extinction.md): the extinction laws.
-- [pseudo-mag-inflate.md](pseudo-mag-inflate.md): widening the pseudo-magnitude error for reddened stars.
-- [outputs.md](outputs.md): what comes out, and how to spot a failed star.
+- [Settings](../reference/settings.md): every setting.
+- [Extinction laws](extinction.md).
+- [Pseudo-magnitude inflation](pseudo-mag-inflate.md): widening the pseudo-magnitude error for reddened stars.
+- [Outputs](../reference/outputs.md), and [which results to trust](../how-to/trust-results.md).

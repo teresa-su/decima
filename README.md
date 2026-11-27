@@ -2,101 +2,68 @@
 
 Decima is the Roman Fate who measures the thread of life. DECIMA is also Distance, Extinction and Chronometry via Isochrone Modelling via Amortised Inference.
 
-This package infers a star's age, distance and extinction, together with its initial [Fe/H], [α/Fe] and evolutionary stage (parametrised by the equivalent evolutionary point, EEP). It needs spectroscopic T_eff and [Fe/H] (and [α/Fe], which is otherwise assumed solar), a Gaia parallax, and Gaia and 2MASS photometry.
+It infers a star's **age**, distance and extinction, together with its initial [Fe/H], [α/Fe] and evolutionary stage, from spectroscopic T_eff and [Fe/H] (and [α/Fe]), a Gaia parallax, and Gaia and 2MASS photometry. Neural posterior estimation on MIST isochrones, then importance sampling over every band and the exact parallax likelihood ([how it works](docs/explanation/method.md)).
 
-DECIMA works in two stages:
-1. Neural posterior estimation of the distance-independent parameters from the spectroscopy and a parallax-based pseudo-magnitude. Measurement noise is handled at inference time.
-2. Importance sampling that folds in every available photometric band, the exact parallax likelihood, the priors and, optionally, the spectroscopic log g.
-
-It is fast: about 0.04 s per star per GPU core.
-How it works: [docs/method.md](docs/method.md).
+**Documentation: <https://teresa-su.github.io/decima/>** (or the `docs/` folder). Start with the [tutorial](docs/tutorial.ipynb).
 
 ## Install
 
 ```bash
-git clone <repo-url> decima && cd decima
+git clone https://github.com/teresa-su/decima && cd decima
 uv sync                 # or: pip install -e .
 ```
 
-Python ≥ 3.10.
+Python ≥ 3.10. The trained models ([doi:10.5281/zenodo.24584265](https://doi.org/10.5281/zenodo.24584265), CC-BY-4.0, 245 MB) are downloaded from Zenodo the first time DECIMA needs them and cached (`~/.cache/decima/v1` on Linux). If your compute nodes have no internet, run `decima download-models` on the login node first. To keep the models elsewhere, or use a copy you already have, set `DECIMA_DATA_DIR` to that directory.
 
-The trained models (≈0.25 GB) are not downloadable yet.
+## The workflow
 
-## Quick start
+```mermaid
+flowchart LR
+    T[("Your catalogue")] --> COLS["decima columns<br/>columns file"]
+    COLS --> CHECK["decima check"]
+    CFG["decima default-config<br/>settings file (optional)"] --> CHECK
+    CHECK --> Q{"How many stars?"}
+    Q -- "few thousand" --> INF["decima.infer"]
+    Q -- "more" --> RUN["decima run<br/>resumable"]
+    INF --> OUT["summary · samples · rejected"]
+    RUN --> OUT
+    OUT --> FILT["drop failed,<br/>check ess_frac"]
+```
+
+Two small JSON files steer a run, and they are different things: the **columns file** maps *DECIMA's column names to yours*; the **settings file** holds every setting that changes the result. Neither is needed if your table already uses [DECIMA's names](docs/reference/inputs.md) and you are happy with the defaults.
+
+```bash
+decima columns stars.fits -o cols.json                        # suggest the columns file; check it
+decima check   stars.fits --columns cols.json                 # catches wrong names, units and settings in seconds
+decima run     stars.fits --columns cols.json --out run/ --workers 16    # resumable: re-run the same command
+```
+
+or in Python, for a few thousand stars:
 
 ```python
 import decima
 
-summary, samples, rejected = decima.infer("stars.fits", columns={"teff": "TEFF", "feh": "FE_H", ...})
-summary["id", "age_p16", "age_p50", "age_p84", "ess_frac"]
+columns = dict(decima.suggest_columns("docs/data/example_stars.ecsv"))
+summary, samples, rejected = decima.infer("docs/data/example_stars.ecsv", columns)
+summary["id", "age_p16", "age_p50", "age_p84", "failed", "ess_frac"]
 ```
 
-For a big catalogue, use the chunked, checkpointed and resumable runner. Re-running the same command resumes it.
-
-```bash
-decima run catalogue.fits --out run/ --columns cols.json --workers 16
-```
-
-or, from Python:
+`suggest_columns` and `check_inputs` need no models:
 
 ```python
-decima.run("catalogue.fits", out="run/", columns=cols, workers=16)
+import decima
+
+report = decima.check_inputs("docs/data/example_stars.ecsv", decima.suggest_columns("docs/data/example_stars.ecsv"))
+print(report.ok, report.n_run, "of", report.n_rows, "stars can be run")
 ```
-
-A worked example on five stars: [examples/quickstart.ipynb](examples/quickstart.ipynb).
-
-## Input
-
-Any table astropy reads (FITS, CSV, ECSV, VOTable, HDF5, Parquet), or an astropy `Table` / pandas `DataFrame`. DECIMA looks for the canonical column names below. Map your own names with `columns={"teff": "TEFF", ...}` in Python, or a JSON file of the same mapping with `--columns` on the shell.
-
-| | Columns |
-|---|---|
-| **required** | `parallax`, `parallax_error` [mas]; `teff`, `teff_error` [K]; `feh`, `feh_error` [dex]; `Ks`, `Ks_error` [mag] |
-| **position** | `ra`, `dec` [deg, ICRS] for the distance prior, unless per-star `L`, `alpha`, `beta` are given; stars with neither are rejected |
-| optional | `id`; `alpha_fe`, `alpha_fe_error`; `logg`, `logg_error`; `G`, `BP`, `RP` (Gaia EDR3/DR3), `J`, `H` (2MASS), each with `_error` |
-| zero-point | `nu_eff_used_in_astrometry`, `pseudocolour`, `ecl_lat`, `astrometric_params_solved` (Gaia archive names), only with `parallax_zero_point=True` |
-
-- **Parallax:** used as given, or with `Config(parallax_zero_point=True)` DECIMA subtracts the Lindegren+21 zero-point
-  itself ([details](docs/settings.md#the-parallax-zero-point)).
-- **Missing values:** NaN or masked.
-  - A missing magnitude means that band is skipped for that star.
-  - A magnitude with no error gets a 0.5 mag error.
-  - A missing [α/Fe] is filled with 0 ± 0.2 by default.
-- **Rejected stars:** stars without a required value or a position, or with `parallax_error ≤ 0`, are not run. They are listed in
-  `rejected` with the reason.
-
-## Settings
-
-All settings that change results are in `decima.Config`. On the shell, `decima default-config > cfg.json` writes them out to edit and pass back with `--config cfg.json`. Full details: [docs/settings.md](docs/settings.md).
-
-| Setting | Default | |
-|---|---|---|
-| `n_latent_x`, `n_theta` | 800, 10 | Stage-1 draws per star: latent observables (the Monte Carlo sample over the noise) × θ per observable |
-| `n_keep` | 400 | Posterior samples saved per star |
-| `seed` | 22 | Random seed for every draw: the same inputs and seed give the same results |
-| `bands` | G BP RP J H Ks | Bands used in stage 2. Any subset that includes Ks. |
-| `extinction` | `"F19"` | Extinction law. Colour-dependent by default. **[docs/extinction.md](docs/extinction.md)** |
-| `pseudo_mag_inflate` | `True` | Widen the pseudo absolute magnitude error for reddened stars to aid stage-1 sampling. **[docs/pseudo-mag-inflate.md](docs/pseudo-mag-inflate.md)** |
-| `parallax_zero_point` | `False` | Subtract the Lindegren+21 Gaia parallax zero-point |
-| `use_logg` | `False` | Include the spectroscopic log g in stage 2 |
-| `device` | `"cpu"` | or `"cuda"` |
-| `stars_per_batch` | 100 | Stars per flow call (memory vs speed) |
-
-Plus the method settings (`mixture_alpha`, `npe_ratio_ceiling`, `imf_prior`, `grey`, `parallax_snr_min`) and the input error floors and fills: all in [docs/settings.md](docs/settings.md).
 
 ## Output
 
-- **`summary`:** one row per star.
-  - Percentiles (5, 16, 50, 84, 95) of `feh_init`, `alpha_fe_init` (the model's initial abundances), `log_age`,
-    `age` [Gyr], `eep`, `distance` [pc] and the extinction (`A0` for the F19 laws, `ebv` for fixed laws).
-  - Quality flags and diagnostics: **`failed`** and **`ess_frac`** are the main ones.
-  - Per-band flags.
-- **`samples`:** (n_stars, n_keep, 7) unweighted posterior draws, in the order `decima.quantity_names(cfg)`.
+- **`summary`:** one row per star run. Percentiles (5, 16, 50, 84, 95) of `age` [Gyr], `distance` [pc], the extinction, `feh_init`, `alpha_fe_init`, `log_age` and `eep`, plus quality flags. **`failed`** and **`ess_frac`** are the ones to filter on.
+- **`samples`:** (n_stars, n_keep, 7) unweighted posterior draws.
 - **`rejected`:** input rows that could not be run, and why.
 
-`decima run` writes `summary.fits`, `samples.h5` and `rejected.ecsv` into the run directory.
-
-**Failed stars** have `failed = True`: either no stage-1 draw was usable (percentiles NaN), or the age posterior has no width on one side of the median (its 16th or 84th percentile equals the median). Don't use their results. What every column means, and other warning signs: [docs/outputs.md](docs/outputs.md).
+`decima run` writes `summary.fits`, `samples.h5` and `rejected.ecsv` into the run directory. [What every column means](docs/reference/outputs.md), and [which results to trust](docs/how-to/trust-results.md).
 
 ## Validated domain and known limitations
 
@@ -124,10 +91,15 @@ So the training covers the main sequence, turn-off, subgiant branch, red giant b
 ## Development
 
 ```bash
-uv sync
-uv run pytest # all tests on linnunrata (~1 min); elsewhere the model-dependent ones are skipped
-DECIMA_DATA_DIR=/path/to/models uv run pytest # all tests, models elsewhere
+uv sync --group docs
+uv run pytest                                              # all tests (the model-dependent ones are skipped without the models)
+DECIMA_DATA_DIR=/path/to/models uv run pytest              # all tests, models elsewhere
+uv run pytest --nbmake docs/how-to/config-files.ipynb      # the notebooks run (the tutorial needs the models)
+uv run python docs/gen_reference.py                        # regenerate the reference tables after changing Config or the columns
+uv run mkdocs serve                                        # preview the site
 ```
+
+To change a notebook, edit its paired `.py` file, then `cd docs && jupytext --to ipynb --execute tutorial.py how-to/config-files.py`.
 
 ## Licence
 

@@ -7,3 +7,7 @@ models/
 REVIEW*.md
 scratch/
 *.tex
+docs/work/
+site/
+.cache/
+dev/

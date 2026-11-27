@@ -6,12 +6,38 @@ on:
 
 jobs:
   fast:
-    # The unit tests that need no models; the regression and runner tests skip without DECIMA_DATA_DIR.
+    # Everything that needs no models: unit tests, the docs build, and the docs that run without them.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
-      - run: uv sync --locked
+      - run: uv sync --locked --group docs
       - run: uv run pytest -q
+      - run: uv run pytest --nbmake docs/how-to/config-files.ipynb
+      - run: uv run pytest --markdown-docs $(find docs -name '*.md')
+      - run: NO_MKDOCS_2_WARNING=1 uv run mkdocs build --strict
+      - uses: lycheeverse/lychee-action@v2
+        with:
+          args: --no-progress --exclude 'teresa-su.github.io' README.md 'docs/**/*.md'
+
+  models:
+    # The regression tests, the tutorial and the README example need the trained models.
+    runs-on: ubuntu-latest
+    env:
+      DECIMA_DATA_DIR: ${{ github.workspace }}/.models
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - uses: actions/cache@v4
+        with:
+          path: .models
+          key: decima-models-v1
+      - run: uv sync --locked --group docs
+      - run: uv run decima download-models
+      - run: uv run pytest -q
+      - run: uv run pytest --nbmake docs/tutorial.ipynb
+      - run: uv run pytest --markdown-docs README.md

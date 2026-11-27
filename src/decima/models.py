@@ -6,12 +6,9 @@ Files (model release v1):
     prior_spec.pt   q(s), the prior-predictive density of s (weights the latent observables)  sbi/zuko NSF
     grid.npz        the MIST grid (`decima.grid.IsochroneGrid`)
 
-The two NPEs are trained on, sample and score the transformed theta_tilde (logit of theta rescaled to the grid range,
-`decima.theta.ThetaTransformer`), not physical theta.
+The two NPEs are trained on, sample and score the transformed theta_tilde (logit of theta rescaled to the grid range, `decima.theta.ThetaTransformer`), not physical theta.
 
-Each .pt is a plain dict {"arch": builder kwargs, "state_dict": weights, "prior_loc"/"prior_scale" (posteriors)}, so
-it loads with `torch.load(weights_only=True)` and does not depend on pickled classes. The files are looked up in
-$DECIMA_DATA_DIR if set.
+Each .pt is a plain dict {"arch": builder kwargs, "state_dict": weights, "prior_loc"/"prior_scale" (posteriors)}, so it loads with `torch.load(weights_only=True)` and does not depend on pickled classes. The files are downloaded from Zenodo (doi:10.5281/zenodo.24584265) on first use, into $DECIMA_DATA_DIR if set, else the user cache directory.
 """
 import os
 from dataclasses import dataclass
@@ -27,33 +24,28 @@ from decima.grid import IsochroneGrid
 from decima.theta import ThetaTransformer
 
 MODEL_VERSION = "v1"
-# file -> (url, sha256). shortcut: filled in once the files are on Zenodo; until then set DECIMA_DATA_DIR.
-REGISTRY = {name: (None, None) for name in ("npe.pt", "npe_spec.pt", "prior_spec.pt", "grid.npz")}
-# shortcut: the internal copy, used when DECIMA_DATA_DIR is unset so linnunrata users need no setup. Remove once the
-# release is on Zenodo.
-LINNUNRATA_DIR = Path("/export/linnunrata/tsu/decima/models")
+DOI = "10.5281/zenodo.24584265" # pinned to the v1 record: a new model release is a new record, DOI and MODEL_VERSION
+REGISTRY = { # file -> md5, as listed on the Zenodo record
+    "npe.pt": "124af31916f1fd9887d892b28f532451",
+    "npe_spec.pt": "9a2d2884a9b135a83ec77e3638027d93",
+    "prior_spec.pt": "945c3df2be09868cf0a8516bafbbd645",
+    "grid.npz": "c260ac033485594a48ce0cb766d8334d",
+}
 
 
 def data_dir() -> Path | None:
-    """The local model directory: $DECIMA_DATA_DIR, else LINNUNRATA_DIR if it exists, else None (download)."""
-    if os.environ.get("DECIMA_DATA_DIR"):
-        return Path(os.environ["DECIMA_DATA_DIR"])
-    return LINNUNRATA_DIR if LINNUNRATA_DIR.is_dir() else None
+    """$DECIMA_DATA_DIR if set, else None (the user cache directory is used)."""
+    d = os.environ.get("DECIMA_DATA_DIR")
+    return Path(d) if d else None
 
 
 def fetch(name: str) -> Path:
-    """Local path of model file `name`: data_dir()/name, or the cached download."""
-    if (d := data_dir()) is not None:
-        path = d / name
-        if not path.exists():
-            raise FileNotFoundError(f"{path} not found (set DECIMA_DATA_DIR to the directory holding the models)")
-        return path
-    url, sha256 = REGISTRY[name]
-    if url is None:
-        raise RuntimeError(f"model release {MODEL_VERSION} is not online yet: set DECIMA_DATA_DIR to a directory "
-                           f"holding {', '.join(REGISTRY)}")
-    return Path(pooch.retrieve(url, known_hash=f"sha256:{sha256}", fname=name,
-                               path=pooch.os_cache("decima") / MODEL_VERSION))
+    """Local path of model file `name`, downloaded from Zenodo and checked if missing."""
+    d = data_dir()
+    if d is not None and (d / name).exists():
+        return d / name # used as is: pooch would overwrite a copy whose hash differs
+    return Path(pooch.retrieve(f"doi:{DOI}/{name}", known_hash=f"md5:{REGISTRY[name]}", fname=name,
+                               path=d or pooch.os_cache("decima") / MODEL_VERSION))
 
 
 class _MovableIndependent(torch.distributions.Independent):

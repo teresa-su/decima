@@ -40,7 +40,7 @@ def _prepare(source, out, columns, cfg, chunk):
     from decima.io import build_inputs, read_table
     out.mkdir(parents=True, exist_ok=True)
     job = {"chunk": chunk}
-    if (out / "inputs.pt").exists():
+    if (out / "inputs.pt").exists() and (out / "config.json").exists(): # config.json is written last: without it the preparation was interrupted, so redo it
         if Config.from_json((out / "config.json").read_text()).to_json() != cfg.to_json() \
                 or json.loads((out / "job.json").read_text()) != job:
             raise ValueError(f"{out} holds a run with different settings; use a new `out` or delete it")
@@ -99,7 +99,8 @@ def _merge(out, cfg, chunk, summary_format):
     summary_table(res, cfg).write(out / f"summary.{summary_format}", overwrite=True)
     with h5py.File(out / "samples.h5", "w") as h:
         h["samples"] = res["samples"]
-        h["id"] = res["ids"]
+        ids = res["ids"]
+        h["id"] = np.char.encode(ids, "utf-8") if ids.dtype.kind == "U" else ids # h5py has no unicode arrays: strings are stored as UTF-8 bytes
         h["quantity_names"] = np.array(quantity_names(cfg), dtype="S")
     _log(out, f"MERGED  {n} stars")
 
