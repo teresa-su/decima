@@ -212,6 +212,28 @@ def failed_stars(age: np.ndarray, no_valid_draw: np.ndarray) -> np.ndarray:
     return np.asarray(no_valid_draw) | (age_lo == age_med) | (age_hi == age_med)
 
 
+def percentiles(q: np.ndarray, pcts, device) -> np.ndarray:
+    """`np.percentile(q, pcts, axis=1)` bit for bit, with the sort of every star's draws on `device`.
+
+    Returns (n_pcts, n_stars, n_q).
+    """
+    n = q.shape[1]
+    virtual = (n - 1) * np.true_divide(np.asarray(pcts), np.float64(100))
+    lo = np.floor(virtual)
+    hi = lo + 1
+    lo[virtual >= n - 1] = hi[virtual >= n - 1] = -1 # numpy takes the last value there
+    lo, hi = lo.astype(np.intp), hi.astype(np.intp)
+    gamma = (virtual - lo).reshape(-1, 1, 1)
+    s = torch.sort(torch.from_numpy(q).to(device), dim=1).values # NaN sorts last, as in numpy
+    take = lambda i: s[:, torch.as_tensor(i, device=s.device)].cpu().numpy().transpose(1, 0, 2)
+    a, b = take(lo), take(hi)
+    diff = b - a
+    out = a + diff * gamma
+    np.subtract(b, diff * (1 - gamma), out=out, where=gamma >= 0.5)
+    out[:, torch.isnan(s[:, -1]).cpu().numpy()] = np.nan # numpy: NaN for a star whose draws hold any NaN
+    return out
+
+
 def run_chunk(inputs: StarInputs, models: Models, cfg: Config, seed: int) -> dict:
     """Stage 1 then stage 2 on one chunk of stars. Returns numpy arrays: ids, percentiles (n, n_pct, n_q),
     samples (n, n_keep, n_q) and per-star diagnostics."""
@@ -222,7 +244,9 @@ def run_chunk(inputs: StarInputs, models: Models, cfg: Config, seed: int) -> dic
     theta = theta.double()
     age = 10 ** (theta[..., 2:3] - 9)
     q = torch.cat([theta, age, d.double().unsqueeze(-1), e.double().unsqueeze(-1)], dim=-1).numpy()
-    pct = np.percentile(q, cfg.percentiles, axis=1).transpose(1, 0, 2) # numpy, as torch.quantile caps at 16M elements
+    # on the CPU numpy's partition beats torch's sort; torch.quantile caps at 16M elements
+    pct = (np.percentile(q, cfg.percentiles, axis=1) if models.device == "cpu"
+           else percentiles(q, cfg.percentiles, models.device)).transpose(1, 0, 2)
     samples = q[:, :cfg.n_keep] # draws are iid, so the first n_keep
     no_valid_draw = diag["no_valid_draw"].numpy()
     failed = failed_stars(q[..., 4], no_valid_draw)

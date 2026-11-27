@@ -6,8 +6,9 @@ M_pseudo,K = parallax * 10^(0.2 Ks - 2) the pseudo absolute magnitude. The flows
 (`decima.theta`). Stage 2 (`inference_stage2`) fits distance and extinction E to every draw, then importance-resamples
 the draws with the photometry, the exact parallax likelihood, the distance prior and the IMF.
 
-Precision: the flows run in float32, as trained, and a batch whose spline inverse fails is redrawn in float64. The
-(mu, E) fit and its sampler run in float64.
+Precision: the flows run in float32, as trained (on a GPU: float16 hidden layers and TF32 matmuls, see
+`_residual_net_forward`), and a batch whose spline inverse fails is redrawn in float64. The (mu, E) fit and its sampler
+run in float64.
 """
 
 import logging
@@ -19,16 +20,17 @@ from typing import Any, Optional
 import torch
 from sbi.inference.posteriors import DirectPosterior
 from sbi.neural_nets.estimators.zuko_flow import ZukoUnconditionalFlow
+from nflows.nn.nets import resnet as _nflows_resnet
 from nflows.transforms.splines import rational_quadratic as _nflows_rq
 from sbi.utils.sbiutils import within_support
 from torch.distributions import Normal
+from torch.nn import functional as F
 
 from decima.distance import bailer_jones
 from decima.extinction import ExtinctionLaw
 from decima.grid import IsochroneGrid
 from decima.theta import ThetaTransformer
 
-_MAX_DRAWS_PER_FLOW_PASS = 100_000 # bounds memory
 _N_S = 3 # q(theta | s) conditions on the first _N_S columns of x = (s, M_pseudo,K)
 log = logging.getLogger("decima")
 
@@ -51,6 +53,60 @@ class _TorchWithFastCumsum:
 
 
 _nflows_rq.torch = _TorchWithFastCumsum()
+
+
+def _residual_block_forward(self, inputs, context=None):
+    """nflows' `ResidualBlock.forward`, with the context gate glu(cat(t, c)) computed as t * sigmoid(c) on CUDA.
+
+    The same arithmetic, bit for bit on CUDA, without materialising the concatenation.
+    """
+    temps = inputs
+    if self.use_batch_norm:
+        temps = self.batch_norm_layers[0](temps)
+    temps = self.activation(temps)
+    temps = self.linear_layers[0](temps)
+    if self.use_batch_norm:
+        temps = self.batch_norm_layers[1](temps)
+    temps = self.activation(temps)
+    temps = self.dropout(temps)
+    temps = self.linear_layers[1](temps)
+    if context is not None:
+        gate = self.context_layer(context)
+        temps = temps * torch.sigmoid(gate) if temps.is_cuda else F.glu(torch.cat((temps, gate), dim=1), dim=1)
+    return inputs + temps
+
+
+_nflows_resnet.ResidualBlock.forward = _residual_block_forward
+
+
+def _residual_net_forward(self, inputs, context=None):
+    """nflows' `ResidualNet.forward`, with the hidden layers in float16 (autocast) for float32 inputs on CUDA.
+    """
+    with torch.autocast("cuda", dtype=torch.float16, enabled=inputs.is_cuda and inputs.dtype == torch.float32):
+        temps = self.initial_layer(inputs if context is None else torch.cat((inputs, context), dim=1))
+        for block in self.blocks:
+            temps = block(temps, context=context)
+    return self.final_layer(temps.to(inputs.dtype))
+
+
+_nflows_resnet.ResidualNet.forward = _residual_net_forward
+
+
+def _max_draws_per_pass(t: torch.Tensor) -> int:
+    """Flow draws per pass, to bound memory"""
+    return 400_000 if t.is_cuda else 100_000
+
+
+@contextmanager
+def _tf32():
+    """TF32 for float32 matmuls on CUDA (Ampere and newer) inside the block, then the caller's setting back.
+    """
+    previous = torch.backends.cuda.matmul.allow_tf32
+    torch.backends.cuda.matmul.allow_tf32 = True
+    try:
+        yield
+    finally:
+        torch.backends.cuda.matmul.allow_tf32 = previous
 
 
 # ========================================== #
@@ -77,15 +133,14 @@ def _module_dtype(module: torch.nn.Module, dtype: torch.dtype):
         module.to(original)
 
 
-def _sample_and_log_prob_batched(posterior: DirectPosterior, n_samples: int, x: torch.Tensor,
-                                 max_draws_per_pass: int = _MAX_DRAWS_PER_FLOW_PASS):
+def _sample_and_log_prob_batched(posterior: DirectPosterior, n_samples: int, x: torch.Tensor):
     """`n_samples` draws of the NPEs (transformed) theta for every row of `x`, with their log q(theta | x).
 
     Returns samples (n_samples, n_obs, theta_dim) and log_probs (n_samples, n_obs). `x` must have the flow's dtype.
     """
     estimator = posterior.posterior_estimator
     estimator.eval()
-    obs_per_pass = max(1, max_draws_per_pass // n_samples)
+    obs_per_pass = max(1, _max_draws_per_pass(x) // n_samples)
     net = getattr(estimator, "net", None)
     fused = net is not None and hasattr(net, "sample_and_log_prob") # nflows: one pass for both
 
@@ -126,24 +181,6 @@ def _draw_theta_tilde(npe: DirectPosterior, n_samples: int, x: torch.Tensor, see
     return samples.to(x.dtype), log_probs.to(x.dtype)
 
 
-def _log_q_theta_s(npe: DirectPosterior, theta_tilde: torch.Tensor, context: torch.Tensor, n_theta: int):
-    """log q(theta | context_i) of every draw, evaluated at the latent observable it was drawn for.
-
-    theta_tilde (n_stars, n_draws, theta_dim): draw k belongs to latent observable k // `n_theta`.
-    context (n_stars, n_latent_x, n_context): s_i for q(theta | s), or x_i for q(theta | x).
-    Returns (n_stars, n_draws) in the dtype of `theta_tilde`.
-    """
-    n_stars, n_draws, theta_dim = theta_tilde.shape
-    theta = theta_tilde.reshape(-1, theta_dim)
-    ctx = context.repeat_interleave(n_theta, dim=1).reshape(-1, context.shape[-1])
-    log_q = torch.cat([
-        npe.log_prob_batched(theta[lo:lo + _MAX_DRAWS_PER_FLOW_PASS].reshape(1, -1, theta_dim),
-                             x=ctx[lo:lo + _MAX_DRAWS_PER_FLOW_PASS], norm_posterior=False).reshape(-1)
-        for lo in range(0, len(theta), _MAX_DRAWS_PER_FLOW_PASS)
-    ])
-    return log_q.view(n_stars, n_draws)
-
-
 def _log_q(npe: DirectPosterior, theta_tilde: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
     """log q(theta | context) in the sampling layout: theta_tilde (n, n_ctx, theta_dim), draw [j, c] at context[c].
 
@@ -152,10 +189,11 @@ def _log_q(npe: DirectPosterior, theta_tilde: torch.Tensor, context: torch.Tenso
     n, n_ctx, theta_dim = theta_tilde.shape
     theta = theta_tilde.reshape(-1, theta_dim) # row j * n_ctx + c
     ctx = context.repeat(n, 1) # row j * n_ctx + c -> context[c]
+    step = _max_draws_per_pass(theta)
     log_q = torch.cat([
-        npe.log_prob_batched(theta[lo:lo + _MAX_DRAWS_PER_FLOW_PASS].reshape(1, -1, theta_dim),
-                             x=ctx[lo:lo + _MAX_DRAWS_PER_FLOW_PASS], norm_posterior=False).reshape(-1)
-        for lo in range(0, len(theta), _MAX_DRAWS_PER_FLOW_PASS)
+        npe.log_prob_batched(theta[lo:lo + step].reshape(1, -1, theta_dim), x=ctx[lo:lo + step],
+                             norm_posterior=False).reshape(-1)
+        for lo in range(0, len(theta), step)
     ])
     return log_q.view(n, n_ctx)
 
@@ -177,6 +215,7 @@ def _cat(parts: list):
 # Stage 1: noise-marginalised NPE draws      #
 # ========================================== #
 
+@_tf32()
 def inference_stage1(
         npe: DirectPosterior,
         npe_spec: DirectPosterior,
