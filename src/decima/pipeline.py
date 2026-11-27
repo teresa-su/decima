@@ -215,9 +215,7 @@ def failed_stars(age: np.ndarray, no_valid_draw: np.ndarray) -> np.ndarray:
 def percentiles(q: np.ndarray, pcts, device) -> np.ndarray:
     """`np.percentile(q, pcts, axis=1)` bit for bit, with the sort of every star's draws on `device`.
 
-    numpy's partition of every star's draws, on one CPU thread, was ~5% of a GPU run. The order statistics do not depend
-    on what sorts them, and the interpolation below is numpy's "linear" method step by step (virtual index, neighbours,
-    gamma, `_lerp`, NaN slices), so the result is identical. Returns (n_pcts, n_stars, n_q).
+    Returns (n_pcts, n_stars, n_q).
     """
     n = q.shape[1]
     virtual = (n - 1) * np.true_divide(np.asarray(pcts), np.float64(100))

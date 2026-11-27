@@ -58,8 +58,7 @@ _nflows_rq.torch = _TorchWithFastCumsum()
 def _residual_block_forward(self, inputs, context=None):
     """nflows' `ResidualBlock.forward`, with the context gate glu(cat(t, c)) computed as t * sigmoid(c) on CUDA.
 
-    The same arithmetic, bit for bit on CUDA, without materialising the concatenation (the cat and glu kernels were 17%
-    of the GPU time of stage 1). On the CPU the two differ in the last bit, so the CPU keeps nflows' original.
+    The same arithmetic, bit for bit on CUDA, without materialising the concatenation.
     """
     temps = inputs
     if self.use_batch_norm:
@@ -82,11 +81,6 @@ _nflows_resnet.ResidualBlock.forward = _residual_block_forward
 
 def _residual_net_forward(self, inputs, context=None):
     """nflows' `ResidualNet.forward`, with the hidden layers in float16 (autocast) for float32 inputs on CUDA.
-
-    The final layer, which outputs the spline parameters, stays float32: in float16 it shifted [Fe/H] by 1e-3 of a
-    posterior width. 1.3x faster end to end on an RTX A4000, posteriors and coverage unchanged within Monte Carlo
-    noise (benchmarks/RESULTS.md). The hidden activations peak at ~300 on real stars and ~2000 at the corners of the
-    prior, far below float16's 65504. The CPU and float64 (the redraw) are unchanged.
     """
     with torch.autocast("cuda", dtype=torch.float16, enabled=inputs.is_cuda and inputs.dtype == torch.float32):
         temps = self.initial_layer(inputs if context is None else torch.cat((inputs, context), dim=1))
@@ -99,16 +93,13 @@ _nflows_resnet.ResidualNet.forward = _residual_net_forward
 
 
 def _max_draws_per_pass(t: torch.Tensor) -> int:
-    """Flow draws per pass, to bound memory: 400k on a GPU (~3 GB; 8% faster than 100k), 100k on the CPU."""
+    """Flow draws per pass, to bound memory"""
     return 400_000 if t.is_cuda else 100_000
 
 
 @contextmanager
 def _tf32():
     """TF32 for float32 matmuls on CUDA (Ampere and newer) inside the block, then the caller's setting back.
-
-    For the flows of stage 1: 13% faster end to end on an RTX A4000, with posteriors unchanged within Monte Carlo
-    noise (benchmarks/RESULTS.md). Stage 2 and float64 work are unaffected.
     """
     previous = torch.backends.cuda.matmul.allow_tf32
     torch.backends.cuda.matmul.allow_tf32 = True
