@@ -11,7 +11,7 @@ decima run catalogue.fits --out run/ --columns cols.json --config settings.json 
 
 The same from Python:
 
-```python notest
+```{.python notest}
 import decima
 
 if __name__ == "__main__":      # needed in a script: workers are started as fresh processes

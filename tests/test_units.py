@@ -16,6 +16,14 @@ from decima.io import build_inputs, read_table
 from decima.io import parallax_zero_point
 from decima.pipeline import Config, failed_stars, summary_table
 
+XIANG_COLUMNS = {
+    "id": "GAIAEDR3_SOURCE_ID_1", "ra": "RAJ2000", "dec": "DEJ2000",
+    "G": "GAIA_G", "BP": "GAIA_BP", "RP": "GAIA_RP", "G_error": "E_GAIA_G", "BP_error": "E_GAIA_BP",
+    "RP_error": "E_GAIA_RP", "J": "TWOMASS_J", "H": "TWOMASS_H", "Ks": "TWOMASS_K", "J_error": "j_msigcom",
+    "H_error": "h_msigcom", "Ks_error": "ks_msigcom", "parallax": "PARALLAX", "parallax_error": "E_PARALLAX",
+    "teff": "TEFF", "teff_error": "E_TEFF", "logg": "LOGG", "logg_error": "E_LOGG", "feh": "FEH", "feh_error": "E_FEH",
+    "alpha_fe": "ALPHA_FE", "alpha_fe_error": "E_ALPHA_FE",
+}
 ROWS = Table({"teff": [5800.0, 6000.0, 5500.0], "teff_error": [80.0, 80.0, 80.0], "feh": [0.0, -0.3, np.nan],
               "feh_error": [0.05] * 3, "parallax": [2.0, 1.0, 1.5], "parallax_error": [0.02, 0.0, 0.02],
               "Ks": [9.0, 10.0, 11.0], "Ks_error": [0.02, np.nan, 0.02], "ra": [10.0, 200.0, 300.0],
@@ -169,7 +177,6 @@ def test_column_info_is_consistent():
 
 
 def test_suggest_columns_reproduces_the_reference_mapping():
-    from test_regression import XIANG_COLUMNS
     sug = decima.suggest_columns(Table.read(Path(__file__).parent / "data" / "reference_stars.ecsv"))
     assert dict(sug) == XIANG_COLUMNS and not sug.ambiguous and not sug.missing and not sug.unused
 
