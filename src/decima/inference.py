@@ -6,8 +6,9 @@ M_pseudo,K = parallax * 10^(0.2 Ks - 2) the pseudo absolute magnitude. The flows
 (`decima.theta`). Stage 2 (`inference_stage2`) fits distance and extinction E to every draw, then importance-resamples
 the draws with the photometry, the exact parallax likelihood, the distance prior and the IMF.
 
-Precision: the flows run in float32, as trained (on a GPU with TF32 matmuls), and a batch whose spline inverse fails is
-redrawn in float64. The (mu, E) fit and its sampler run in float64.
+Precision: the flows run in float32, as trained (on a GPU: float16 hidden layers and TF32 matmuls, see
+`_residual_net_forward`), and a batch whose spline inverse fails is redrawn in float64. The (mu, E) fit and its sampler
+run in float64.
 """
 
 import logging
@@ -77,6 +78,24 @@ def _residual_block_forward(self, inputs, context=None):
 
 
 _nflows_resnet.ResidualBlock.forward = _residual_block_forward
+
+
+def _residual_net_forward(self, inputs, context=None):
+    """nflows' `ResidualNet.forward`, with the hidden layers in float16 (autocast) for float32 inputs on CUDA.
+
+    The final layer, which outputs the spline parameters, stays float32: in float16 it shifted [Fe/H] by 1e-3 of a
+    posterior width. 1.3x faster end to end on an RTX A4000, posteriors and coverage unchanged within Monte Carlo
+    noise (benchmarks/RESULTS.md). The hidden activations peak at ~300 on real stars and ~2000 at the corners of the
+    prior, far below float16's 65504. The CPU and float64 (the redraw) are unchanged.
+    """
+    with torch.autocast("cuda", dtype=torch.float16, enabled=inputs.is_cuda and inputs.dtype == torch.float32):
+        temps = self.initial_layer(inputs if context is None else torch.cat((inputs, context), dim=1))
+        for block in self.blocks:
+            temps = block(temps, context=context)
+    return self.final_layer(temps.to(inputs.dtype))
+
+
+_nflows_resnet.ResidualNet.forward = _residual_net_forward
 
 
 def _max_draws_per_pass(t: torch.Tensor) -> int:
