@@ -14,7 +14,7 @@ from decima.distance import BJ_DEFAULT_PARAMS, _bj_ggd_table, bailer_jones, bj_p
 from decima.extinction import F19_BPRP, FixedLaw, PolynomialLaw, SS2018, get_law
 from decima.io import build_inputs, read_table
 from decima.io import parallax_zero_point
-from decima.pipeline import Config, failed_stars, summary_table
+from decima.pipeline import Config, failed_stars, percentiles, summary_table
 
 XIANG_COLUMNS = {
     "id": "GAIAEDR3_SOURCE_ID_1", "ra": "RAJ2000", "dec": "DEJ2000",
@@ -118,6 +118,18 @@ def test_failed_stars():
     age[2, :60] = 3.0           # collapsed on one side
     assert list(failed_stars(age, np.array([False, False, False]))) == [False, True, True]
     assert list(failed_stars(age[:1], np.array([True]))) == [True]
+
+
+@pytest.mark.parametrize("device", ["cpu"] + (["cuda"] if torch.cuda.is_available() else []))
+def test_percentiles_match_numpy_bit_for_bit(device):
+    rng = np.random.default_rng(0)
+    for n in (1, 2, 7, 8000):
+        q = rng.normal(size=(20, n, 3)) * 10 ** rng.uniform(-3, 4, size=(20, 1, 3))
+        q[:5] = np.round(q[:5]) # ties
+        q[7, rng.integers(0, n), 1] = np.nan
+        q[8, :, 2] = 3.0
+        for pcts in ((5, 16, 50, 84, 95), (0, 2.5, 50, 97.5, 100), (33.3,)):
+            assert np.array_equal(percentiles(q, pcts, device), np.percentile(q, pcts, axis=1), equal_nan=True)
 
 
 def test_summary_meta_roundtrip(tmp_path):
