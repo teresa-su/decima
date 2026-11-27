@@ -6,7 +6,7 @@ DECIMA returns a posterior for every star it can run, including stars where some
 
 `failed = True` means the star's result is not usable: either no stage-1 draw was usable (its percentiles are NaN), or its age posterior has no width on one side of the median, because a few draws carry all the weight. `uniform_fallback = True` means every weight vanished and the "posterior" is just the proposal: treat it as failed too.
 
-```python notest
+```{.python notest}
 good = ~summary["failed"] & ~summary["uniform_fallback"]
 ```
 
@@ -16,7 +16,7 @@ On the Xiang+24 catalogue (≈250,000 stars) 0.1% of stars failed.
 
 `ess_frac` is the effective sample size of the final importance weights as a fraction of the `n_latent_x × n_theta` draws. The effective sample size is roughly the number of independent posterior draws behind the percentiles:
 
-```python notest
+```{.python notest}
 cfg = decima.Config()
 summary["ess"] = summary["ess_frac"] * cfg.n_latent_x * cfg.n_theta
 ```

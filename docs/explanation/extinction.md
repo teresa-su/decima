@@ -60,7 +60,7 @@ cfg = decima.Config(extinction=law)
 **A Fitzpatrick+19-form polynomial with your own coefficients:** ten per band, in the order
 `decima.extinction.POLY_TERMS`, with X either `"BP-RP"` or `"teff"`:
 
-```python notest
+```{.python notest}
 law = decima.PolynomialLaw(coeffs, x="BP-RP", x_range=(-0.06, 2.5), a0_max=20.0, r_v=3.1)
 ```
 

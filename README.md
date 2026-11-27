@@ -13,6 +13,19 @@ git clone https://github.com/teresa-su/decima && cd decima
 uv sync                 # or: pip install -e .
 ```
 
+`uv sync` creates the environment in `decima/.venv`. Activate it so that `decima` and `python` find the install (or skip activating and prefix commands with `uv run`):
+
+```bash
+source .venv/bin/activate
+```
+
+To use DECIMA in Jupyter, install the notebook extras and register the environment as a kernel (or, in VS Code, choose `.venv/bin/python` as the interpreter):
+
+```bash
+uv sync --group dev
+python -m ipykernel install --user --name decima
+```
+
 Python ≥ 3.10. The trained models ([doi:10.5281/zenodo.24584265](https://doi.org/10.5281/zenodo.24584265), CC-BY-4.0, 245 MB) are downloaded from Zenodo the first time DECIMA needs them and cached (`~/.cache/decima/v1` on Linux). If your compute nodes have no internet, run `decima download-models` on the login node first. To keep the models elsewhere, or use a copy you already have, set `DECIMA_DATA_DIR` to that directory.
 
 ## The workflow
