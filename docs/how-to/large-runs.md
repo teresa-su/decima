@@ -60,6 +60,6 @@ Put `"device": "cuda"` in the settings file (or `cuda:1` for a particular GPU):
 decima default-config | sed 's/"cpu"/"cuda"/' > settings.json
 ```
 
-- All workers share the GPU, so a few workers are enough to keep it busy.
-- Raise `stars_per_batch` (default 100) on a GPU; lower it if memory runs out.
+- One worker keeps a GPU busy. On an RTX A4000 it runs about 43 stars/s (250,000 stars in 1.6 h, using 2.7 GB of GPU memory), about ten times what 16 CPU workers do. More workers on the same GPU add nothing but memory.
+- Lower `stars_per_batch` (default 100) if GPU memory runs out.
 - CUDA and CPU draw different random numbers, so their results differ within the posterior's noise.

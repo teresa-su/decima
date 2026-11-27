@@ -19,3 +19,4 @@ First version for testing outside the group.
 - Fixed: `decima run` crashed after the compute when ids were strings; a run interrupted during preparation could not resume.
 - Trained models (release v1) are downloaded from Zenodo (doi:10.5281/zenodo.24584265) on first use, into the user cache or `$DECIMA_DATA_DIR`; `decima download-models` fetches them ahead of a run.
 - Docs reorganised (tutorial, how-to, reference, explanation) with a mkdocs site; notebooks and code blocks are tested in CI.
+- GPU runs are 1.77x faster (RTX A4000: 42.6 stars/s, 250,000 stars in 1.6 h): float16 hidden layers and TF32 in the flows, no concatenation in their context gate, 400k-draw flow passes, and summary percentiles from a GPU sort. Posteriors change only within Monte Carlo noise; CPU results are bit-identical. Benchmarks in `benchmarks/`.
