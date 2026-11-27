@@ -82,7 +82,7 @@ So the training covers the main sequence, turn-off, subgiant branch, red giant b
 
 **Validated on:**
 - **Mock stars** from that prior (no extinction), against nested sampling. Posterior coverage is close to nominal: 5.6–7.7% of true values fall outside the 95% interval, against 5% nominal.
-- **Real stars:** the Xiang+24 LAMOST catalogue of turn-off and subgiant stars (≈250,000 single stars). These have T_eff ≈ 5000–6650 K, log g ≈ 3.35–4.3 and [Fe/H] ≈ −1.7 to +0.3. Against the catalogue ages, the residuals have mean +0.2 Gyr and RMS 1.05 Gyr.
+- **Real stars:** the Xiang+24 LAMOST catalogue of turn-off and subgiant stars (≈250,000 single stars). These have T_eff ≈ 5000–6650 K, log g ≈ 3.35–4.3 and [Fe/H] ≈ −1.7 to +0.3.
 
 **Known weaknesses:**
 - **Binaries:** unresolved binaries are not modelled.
