@@ -36,8 +36,5 @@ dev = ["pytest", "gaiadr3-zeropoint", "ipykernel", "matplotlib"] # tests, and ru
 docs = ["mkdocs-material", "mkdocs-jupyter", "mkdocstrings[python]", "jupytext", "nbmake", "pytest-markdown-docs"] # building the docs site and testing the docs
 
 [tool.uv]
-# The regression test compares against isosbi (sbi 0.25) bit for bit; these versions pass it.
+# These versions reproduce isosbi (sbi 0.25) bit for bit.
 constraint-dependencies = ["torch==2.5.1", "sbi==0.27.0", "nflows==0.14", "zuko==1.5.0", "numpy==2.2.6"]
-
-[tool.pytest.ini_options]
-markers = ["slow: needs the full models (DECIMA_DATA_DIR) and a few minutes of CPU"]

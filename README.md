@@ -105,8 +105,7 @@ So the training covers the main sequence, turn-off, subgiant branch, red giant b
 
 ```bash
 uv sync --group docs
-uv run pytest                                              # all tests (the model-dependent ones are skipped without the models)
-DECIMA_DATA_DIR=/path/to/models uv run pytest              # all tests, models elsewhere
+uv run pytest                                              # all tests
 uv run pytest --nbmake docs/how-to/config-files.ipynb      # the notebooks run (the tutorial needs the models)
 uv run python docs/gen_reference.py                        # regenerate the reference tables after changing Config or the columns
 uv run mkdocs serve                                        # preview the site
