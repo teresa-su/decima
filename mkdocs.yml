@@ -1,0 +1,49 @@
+site_name: DECIMA
+site_description: Stellar ages, distances and extinctions from spectroscopy and photometry
+repo_url: https://github.com/teresa-su/decima
+theme:
+  name: material
+  features: [navigation.sections, content.code.copy]
+exclude_docs: |
+  *.py
+  work/
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+plugins:
+  - search
+  - mkdocs-jupyter:
+      execute: false
+      ignore_h1_titles: true
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_root_heading: true
+            show_source: false
+            docstring_style: google
+nav:
+  - Home: index.md
+  - Tutorial: tutorial.ipynb
+  - How-to guides:
+      - Make your columns file and settings file: how-to/config-files.ipynb
+      - Run a large catalogue: how-to/large-runs.md
+      - Decide which results to trust: how-to/trust-results.md
+  - Reference:
+      - Input columns: reference/inputs.md
+      - Settings: reference/settings.md
+      - Outputs: reference/outputs.md
+      - Python API: reference/api.md
+  - Explanation:
+      - How DECIMA works: explanation/method.md
+      - Extinction laws: explanation/extinction.md
+      - Pseudo-magnitude inflation: explanation/pseudo-mag-inflate.md

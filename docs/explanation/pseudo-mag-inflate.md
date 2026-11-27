@@ -46,33 +46,6 @@ A star's error is inflated (`pseudo_mag_inflated = True` in the summary) only wh
 
 Otherwise the error is left as it was, and the star runs normally.
 
-## Caveats
-
-- **Giants and log g.** The Casagrande+21 relation covers giants as well as dwarfs: log g is one of its terms, so a giant
-  with a measured log g is handled correctly. Only a *missing* log g is filled with the dwarf/subgiant value 4.0, so a
-  giant without log g gets the wrong intrinsic colour, and so the wrong A_K. Pipelines that give log g (GALAH, APOGEE)
-  are not affected.
-- **T_eff scale.** A_K inherits any offset between your pipeline's T_eff scale and Casagrande+21's (an IRFM scale): about
-  0.003 mag in A_K per 30 K. A pipeline whose T_eff is 100 K too cool gives A_K about 0.01 mag too high for every star. That only
-  slightly over-widens the error, but turn the option off if you know your scale is far off.
-- **Only widens.** If A_K is underestimated the inflation is too small, and the star behaves as with `pseudo_mag_inflate=False`.
-
-## Evidence
-
-An A/B test on 5000 single Xiang+24 stars, with and without the inflation:
-
-| Stars | Effect of the inflation |
-|---|---|
-| A_K < 0.08 (84% of stars) | No change |
-| A_K ≥ 0.08 | Ages 1% younger, distances +0.5%, posterior widths 7–12% larger |
-| All stars | Stars with stage-2 `ess_frac` < 1% fell from **5.1% to 1.9%** |
-
-Agreement with the catalogue ages was essentially unchanged.
-
-So the gain is robustness: fewer stars where stage 2 has too few useful draws. It is not a shift in typical results.
-
-This test used an earlier proposal: q(θ | s, M_pseudo,K) alone, without the defensive mixture. The mixture is itself
-more robust to this kind of mismatch, so the gain under the current default may be smaller.
 
 ## Reference
 

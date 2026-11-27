@@ -32,7 +32,8 @@ build-backend = "hatchling.build"
 packages = ["src/decima"]
 
 [dependency-groups]
-dev = ["pytest", "gaiadr3-zeropoint", "ipykernel", "matplotlib"] # tests, and running examples/quickstart.ipynb
+dev = ["pytest", "gaiadr3-zeropoint", "ipykernel", "matplotlib"] # tests, and running the notebooks in docs/
+docs = ["mkdocs-material", "mkdocs-jupyter", "mkdocstrings[python]", "jupytext", "nbmake", "pytest-markdown-docs"] # building the docs site and testing the docs
 
 [tool.uv]
 # The regression test compares against isosbi (sbi 0.25) bit for bit; these versions pass it.

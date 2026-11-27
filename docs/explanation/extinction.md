@@ -30,7 +30,7 @@ A fixed law uses one R_b per band for every star. A colour-dependent law gives e
     k_b = A_b / A0 = c₀ + c₁X + c₂X² + c₃X³ + c₄A + c₅A² + c₆A³ + c₇XA + c₈AX² + c₉XA²
 
 where A = A0, and X is the *intrinsic* colour (or T_eff) of the draw being weighted, taken from the noise-free isochrone.
-Because k_b depends on A0, the value being fitted, stage 2 fits once with k_b at A0 = 0, then refits once with k_b at
+Since k_b depends on A0, the value being fitted, stage 2 fits once with k_b at A0 = 0, then refits once with k_b at
 the fitted A0.
 
 Two clamps keep the polynomial inside its calibration, so it is never extrapolated:
@@ -51,6 +51,8 @@ To convert, E(B−V) = A0 / 3.1.
 **Constant R_b per band:**
 
 ```python
+import decima
+
 law = decima.FixedLaw({"G": 2.29, "BP": 3.05, "RP": 1.74, "J": 0.63, "H": 0.32, "Ks": 0.16})
 cfg = decima.Config(extinction=law)
 ```
@@ -58,7 +60,7 @@ cfg = decima.Config(extinction=law)
 **A Fitzpatrick+19-form polynomial with your own coefficients:** ten per band, in the order
 `decima.extinction.POLY_TERMS`, with X either `"BP-RP"` or `"teff"`:
 
-```python
+```python notest
 law = decima.PolynomialLaw(coeffs, x="BP-RP", x_range=(-0.06, 2.5), a0_max=20.0, r_v=3.1)
 ```
 
@@ -66,7 +68,7 @@ law = decima.PolynomialLaw(coeffs, x="BP-RP", x_range=(-0.06, 2.5), a0_max=20.0,
 
 **Anything else:** subclass `decima.ExtinctionLaw`. Set `bands`, `colour_dependent`, `extinction_name` and `columns`
 (the isochrone columns you need), and implement `__call__`. Its contract is in the docstring of
-[`decima/extinction.py`](../src/decima/extinction.py). Define `to_dict` as well if runs using the law should be reproducible
+[`decima/extinction.py`](https://github.com/teresa-su/decima/blob/main/src/decima/extinction.py). Define `to_dict` as well if runs using the law should be reproducible
 from `config.json`.
 
 A law must have coefficients for every band in `Config.bands`.

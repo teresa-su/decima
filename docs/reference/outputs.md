@@ -30,7 +30,7 @@ The seven columns of `samples`, in order (`decima.quantity_names(cfg)`):
 | `eep` | — | MIST equivalent evolutionary point: 202 ZAMS, 454 TAMS, 605 RGB tip, 631 ZACHeB, 707 end of core-He burning |
 | `age` | Gyr | 10^(log_age − 9) |
 | `distance` | pc | |
-| `A0` or `ebv` | mag | A0 for the colour-dependent laws (F19, F19_TEFF); E(B−V) for fixed laws. See [extinction.md](extinction.md). |
+| `A0` or `ebv` | mag | A0 for the colour-dependent laws (F19, F19_TEFF); E(B−V) for fixed laws. See [Extinction laws](../explanation/extinction.md). |
 
 The samples are **unweighted** draws from the posterior. They were resampled from the `n_latent_x` × `n_theta`
 importance-weighted draws, so some appear more than once. They are already in random order, so the first k of them are
@@ -38,22 +38,27 @@ a valid smaller sample.
 
 ## The summary table
 
+`id` comes from the input `id` column, or is the 0-based input row. Then, for each quantity above and each of `Config.percentiles` (5, 16, 50, 84, 95), a column `<quantity>_p<P>`, such as `age_p50` or `distance_p16`. Then the diagnostics and flags:
+
+<!-- BEGIN GENERATED: diagnostics -->
+<!-- written by docs/gen_reference.py: edit the code, not this table -->
+
 | Column | Meaning |
 |---|---|
-| `id` | From the input `id` column, or the input row number |
-| `<q>_p<P>` | Percentile P of quantity q (e.g. `age_p50`, `distance_p16`), for each quantity above and each `Config.percentiles` |
-| `failed` | The star failed (below). Its results should not be used. |
-| `uniform_fallback` | Every importance weight vanished, so the "posterior" is just the stage-1 proposal. Treat as failed. |
-| `ess_frac` | Effective sample size of the stage-2 importance weights, as a fraction of the stage-1 draws. **The main quality number.** |
-| `ess_norm_stage1` | ESS of the stage-1 q(s) weights / draws. Low when the spectroscopy sits at the edge of the training prior. |
-| `frac_valid_samples_pre` | Fraction of stage-1 draws usable in stage 2: on the grid, with enough bands, and a finite weight |
-| `frac_colour_clipped` | Fraction of draws whose intrinsic colour was outside the extinction law's calibration (colour-dependent laws only) |
-| `n_negative_extinction` | Draws whose sampled extinction was negative or NaN, and which were dropped |
-| `par_valid` | The parallax was precise enough to enter the stage-2 distance–extinction fit directly (`Config.parallax_snr_min`). The exact parallax likelihood is used either way. |
-| `pseudo_mag_inflated` | The pseudo absolute magnitude error was widened by an A_K estimate ([pseudo-mag-inflate.md](pseudo-mag-inflate.md)) |
-| `zero_point_applied` | The Lindegren+21 parallax zero-point was subtracted (`Config.parallax_zero_point`) |
-| `<band>_used` | The band had a magnitude and an error for this star |
-| `<band>_err_missing` | The band had a magnitude but no error, so `Config.missing_err` was used |
+| `failed` | The star failed: no usable stage-1 draw, or an age posterior with no width on one side of the median. Do not use its results. |
+| `uniform_fallback` | Every importance weight vanished, so the 'posterior' is just the stage-1 proposal. Treat as failed. |
+| `ess_frac` | Effective sample size of the stage-2 importance weights as a fraction of the stage-1 draws. The main quality number. |
+| `ess_norm_stage1` | Effective sample size of the stage-1 q(s) weights as a fraction of the draws. Low when the spectroscopy sits at the edge of the training prior. |
+| `frac_valid_samples_pre` | Fraction of stage-1 draws usable in stage 2: on the grid, with enough bands, and a finite weight. |
+| `frac_colour_clipped` | Fraction of draws whose intrinsic colour was outside the extinction law's calibration (colour-dependent laws only). |
+| `n_negative_extinction` | Number of draws whose sampled extinction was negative or NaN, and which were dropped. |
+| `par_valid` | The parallax was precise enough (`parallax_snr_min`) to enter the stage-2 distance-extinction fit directly. The exact parallax likelihood is used either way. |
+| `pseudo_mag_inflated` | The pseudo absolute magnitude error was widened by an A_K estimate (`pseudo_mag_inflate`). |
+| `zero_point_applied` | The Lindegren+21 parallax zero-point was subtracted from this star's parallax (`parallax_zero_point`). |
+| `{band}_used` | The band had a magnitude and an error for this star, so it entered stage 2. |
+| `{band}_err_missing` | The band had a magnitude but no error, so `missing_err` was used. |
+
+<!-- END GENERATED: diagnostics -->
 
 The table's header (FITS) or meta (ECSV) records the DECIMA version (`DECIMA`), the model release (`MODELS`) and the
 full config (`CONFIG`, as JSON).

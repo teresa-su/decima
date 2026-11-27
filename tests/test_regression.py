@@ -1,6 +1,6 @@
 """DECIMA against the isosbi pipeline it was extracted from: identical stage-1 + stage-2 outputs, bit for bit, on CPU.
 
-Needs the exported models (see decima.models.data_dir).
+Needs the models in $DECIMA_DATA_DIR (`decima download-models` puts them there).
 """
 from pathlib import Path
 

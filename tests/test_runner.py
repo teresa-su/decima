@@ -37,3 +37,21 @@ def test_workers_resume_and_infer(tmp_path):
 
     with pytest.raises(ValueError): # another config in the same directory
         decima.run(STARS, tmp_path / "w1", workers=1, **dict(kw, config=decima.Config(n_theta=20)))
+
+
+def test_string_ids_reach_samples_h5(tmp_path):
+    t = Table.read(STARS)
+    t["GAIAEDR3_SOURCE_ID_1"] = [f"star{i}" for i in range(len(t))]  # CSV / pandas ids are strings, which h5py cannot store as is
+    decima.run(t, tmp_path, columns=XIANG_COLUMNS, config=CFG, chunk=3, summary_format="ecsv")
+    with h5py.File(tmp_path / "samples.h5") as h:
+        assert [i.decode() for i in h["id"][()]] == [f"star{i}" for i in range(5)]
+
+
+def test_run_interrupted_during_preparation_restarts(tmp_path):
+    kw = dict(columns=XIANG_COLUMNS, config=CFG, chunk=3, summary_format="ecsv")
+    decima.run(STARS, tmp_path, **kw)
+    (tmp_path / "config.json").unlink()  # config.json is written last: a run stopped before it has inputs.pt only
+    for f in tmp_path.glob("chunk_*.npz"):
+        f.unlink()
+    decima.run(STARS, tmp_path, **kw)  # prepares again instead of failing on the missing config.json
+    assert len(Table.read(tmp_path / "summary.ecsv")) == 5
